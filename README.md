@@ -12,6 +12,7 @@ HMM Discovery is built for researchers, graduate students, and bioinformatics co
 - [Repository Contents](#repository-contents)
 - [Quick Start With Conda Or Mamba](#quick-start-with-conda-or-mamba)
 - [Quick Start With Docker](#quick-start-with-docker)
+- [Comprehensive Startup Guide](docs/STARTUP_GUIDE.md)
 - [First Demo Run](#first-demo-run)
 - [No-Code App Runs](#no-code-app-runs)
 - [Full Research Run](#full-research-run)
@@ -59,6 +60,7 @@ www/index.html            Website-style landing page for the app
 www/presentation/         Presentation-ready workflow diagrams
 example_data/             Synthetic demo data only
 docs/                     Interactive guide, blog post, deployment checklist
+docs/STARTUP_GUIDE.md     Comprehensive startup guide for Conda, Docker, demo runs, and long runs
 docs/METHODOLOGY.md       Scientific workflow and manuscript-facing methodology
 docs/DOCUMENTATION_INDEX.md  Map of user, reviewer, deployment, and citation docs
 ACKNOWLEDGEMENTS.md       Tool/database citation guidance

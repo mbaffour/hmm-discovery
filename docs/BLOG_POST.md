@@ -18,10 +18,30 @@ The deployment bundle includes a conda environment, Dockerfile, setup scripts, a
 
 ## Getting Started
 
-1. Clone the repository and install the conda environment (`conda env create -f environment.yml`).
-2. Launch the app with `./run_app.sh` and open `http://127.0.0.1:8081`.
-3. Create a new project, load `example_data/demo_protein_family.fasta`, and click through the alignment, HMM build, and self-search validation steps.
-4. When ready for real data, replace the demo FASTA with your curated seed sequences and select the databases relevant to your biology.
+The fastest local startup path is:
+
+```bash
+git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+conda env create -f environment.yml
+conda activate hmm-discovery
+./run_app.sh
+```
+
+Then open `http://127.0.0.1:8081`. Docker users can instead run:
+
+```bash
+git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+docker build -t hmm-discovery .
+docker run --rm -p 8081:8081 hmm-discovery
+```
+
+The first run should use the synthetic demo data. Create a new project, load `example_data/demo_protein_family.fasta`, run alignment, build the HMM, confirm seed recovery, and export a ZIP. That demo confirms the app, environment, reporting, and export workflow before real data enters the system.
+
+For a real protein-family run, start with curated seed proteins and search fast protein databases before scaling to nucleotide genomes, GPD, GVD-AVrC, or RefSeq bacterial proteins. For a single-genome question, register one nucleotide FASTA or GenBank file as a custom database, select only that target, and use exhaustive six-frame ORFs when short, overlapping, or annotation-missed genes matter.
+
+The full startup reference is in `docs/STARTUP_GUIDE.md`, and the public website includes an interactive Startup section.
 
 ## What Makes This Different?
 

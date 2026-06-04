@@ -7,6 +7,8 @@ Use this index to decide which document belongs in which context.
 - `README.md`: quick start, installation, first demo run, database behavior,
   output overview, no-code app-running expectations, troubleshooting, and
   privacy notes.
+- `docs/STARTUP_GUIDE.md`: comprehensive startup path for Conda, Docker,
+  demo runs, single-genome scans, long runs, and common launch problems.
 - `www/guide.html`: interactive browser guide bundled with the app.
 - `www/index.html`: website-style landing page introducing the app and linking
   the main guide.

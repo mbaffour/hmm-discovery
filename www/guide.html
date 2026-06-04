@@ -219,6 +219,7 @@
   <main>
     <nav aria-label="Guide tabs">
       <button class="active" data-tab="start">Start</button>
+      <button data-tab="startup">Startup</button>
       <button data-tab="workflow">Workflow</button>
       <button data-tab="databases">Databases</button>
       <button data-tab="planner">Run Planner</button>
@@ -235,18 +236,68 @@
       <div class="grid">
         <div class="card">
           <h3>Conda</h3>
-          <pre>conda env create -f environment.yml
+          <pre>git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+conda env create -f environment.yml
 conda activate hmm-discovery
 ./run_app.sh</pre>
         </div>
         <div class="card">
           <h3>Docker</h3>
-          <pre>docker build -t hmm-discovery .
+          <pre>git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+docker build -t hmm-discovery .
 docker run --rm -p 8081:8081 hmm-discovery</pre>
         </div>
       </div>
       <p>Open <code>http://127.0.0.1:8081</code>, create a project, and load <code>example_data/demo_protein_family.fasta</code>.</p>
       <p>After launch, ordinary users do not need to write code. Project setup, input loading, HMM building, database selection, single-genome scans, six-frame ORF discovery, summaries, cleanup, and export are all available through the app interface.</p>
+    </section>
+
+    <section id="startup" class="tab">
+      <h2>Comprehensive Startup Guide</h2>
+      <p>Use this when you are starting on a fresh computer, helping a labmate, or preparing a shared deployment.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>1. Pick an install route</h3>
+          <p>Use Conda/Mamba for a normal laptop or workstation install. Use Docker for a repeatable container deployment or shared server.</p>
+        </div>
+        <div class="card">
+          <h3>2. Launch the app</h3>
+          <p>Run <code>./run_app.sh</code>, then open <code>http://127.0.0.1:8081</code>. The public website cannot launch the local app by itself; the app starts from your machine or server.</p>
+        </div>
+        <div class="card">
+          <h3>3. Run the demo first</h3>
+          <p>Create a project, load <code>example_data/demo_protein_family.fasta</code>, build the alignment/HMM, validate seed recovery, and export a ZIP.</p>
+        </div>
+        <div class="card">
+          <h3>4. Start small with real data</h3>
+          <p>Load curated protein seeds, confirm the HMM works, then search fast protein databases before large genome or gut viral catalogues.</p>
+        </div>
+        <div class="card">
+          <h3>5. Single-genome scan</h3>
+          <p>Register one nucleotide FASTA or GenBank file in Database Setup, select only that target in Step 4, and use six-frame ORFs when unusual genes matter.</p>
+        </div>
+        <div class="card">
+          <h3>6. Long runs</h3>
+          <p>Keep the computer awake, watch disk space, export summaries, then clear cache files when the final report and ZIP are safely saved.</p>
+        </div>
+      </div>
+      <details open><summary>Conda startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+conda env create -f environment.yml
+conda activate hmm-discovery
+./run_app.sh</pre></details>
+      <details><summary>Docker startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+docker build -t hmm-discovery .
+docker run --rm -p 8081:8081 hmm-discovery</pre></details>
+      <details><summary>Persistent Docker projects</summary><pre>mkdir -p projects
+docker run --rm -p 8081:8081 \
+  -v "$PWD/projects:/app/projects" \
+  hmm-discovery</pre></details>
+      <details><summary>Keep macOS awake for long runs</summary><pre>caffeinate -dimsu</pre><p>Stop it with <code>Control-C</code> after the run finishes.</p></details>
+      <p>Full Markdown reference: <a href="https://github.com/mbaffour/hmm-discovery/blob/main/docs/STARTUP_GUIDE.md">docs/STARTUP_GUIDE.md</a>.</p>
     </section>
 
     <section id="workflow" class="tab">
@@ -364,6 +415,7 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
     const feedback = document.getElementById("tab-feedback");
     const messages = {
       start: "Start with a clean demo run, then scale only when the HMM recovers seeds cleanly.",
+      startup: "Install once, launch locally, run the demo, then scale carefully.",
       workflow: "Follow the same scientific story every time: input, build, search, review, export.",
       databases: "Pick databases for the question. The app does not download everything unless you ask it to.",
       planner: "Choose the smallest run that answers the question, then add breadth and specificity checks.",

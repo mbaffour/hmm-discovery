@@ -624,9 +624,55 @@
     .bottom-callout p { margin: 0; color: #304160; }
     .article-section { margin-top: 38px; }
     .article-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .startup-panel {
+      padding: 24px;
+      background:
+        linear-gradient(135deg, rgba(240,250,249,0.92), rgba(255,255,255,0.96)),
+        #ffffff;
+    }
+    .startup-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 16px;
+    }
+    .startup-card {
+      border: 1px solid #cfdbe8;
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 18px;
+      min-width: 0;
+      box-shadow: 0 12px 28px rgba(7,17,47,0.05);
+    }
+    .startup-card h3 { color: #07112f; margin-top: 0; }
+    .startup-card ol,
+    .startup-card ul { margin: 10px 0 0; padding-left: 20px; color: #304160; }
+    .startup-card li { margin: 5px 0; }
+    .code-block {
+      display: block;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #0f1f2e;
+      color: #e8f6f4;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .startup-note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-left: 4px solid #0f766e;
+      background: #f5fbfb;
+      color: #263a58;
+      border-radius: 0 8px 8px 0;
+    }
     @media (max-width: 1280px) {
       .showcase-hero,
-      .lower-grid { grid-template-columns: 1fr; }
+      .lower-grid,
+      .startup-grid { grid-template-columns: 1fr; }
       .database-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .workflow-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
       .flow-arrow { display: none; }
@@ -650,7 +696,7 @@
       .brand-mark { width: 34px; height: 34px; }
       .hero-copy h1 { font-size: 2.35rem; }
       .hero-features { grid-template-columns: 1fr; }
-      .protein-map, .db-panel, .synteny-panel, .workflow-strip, .bottom-callout { padding: 16px; }
+      .protein-map, .db-panel, .synteny-panel, .workflow-strip, .bottom-callout, .startup-panel { padding: 16px; }
       .legend, .gene-legend { gap: 10px; }
       .map-label { white-space: normal; }
       .hero-actions .nav-button { width: 100%; }
@@ -665,6 +711,7 @@
         <a href="#how-it-works">How It Works</a>
         <a href="#databases">Databases</a>
         <a href="#workflows">Example Workflows</a>
+        <a href="#startup">Startup</a>
         <a href="guide.html">Documentation</a>
         <a href="#about">About</a>
       </nav>
@@ -761,6 +808,69 @@
         <p>HMM Discovery combines profile HMMs with curated annotation and genomic context to maximize sensitivity without sacrificing specificity, giving scientists a smoother path from sequence to biological insight.</p>
         <a class="nav-button" href="guide.html">View Example Workflow</a>
       </div>
+    </section>
+
+    <section class="article-section panel startup-panel" id="startup">
+      <div class="section-head">
+        <h2>Startup Guide</h2>
+        <p>From GitHub to a working no-code app: install once, launch the browser interface, run the synthetic demo, then move to real protein-family or single-genome analyses.</p>
+      </div>
+      <div class="startup-grid">
+        <article class="startup-card">
+          <h3>Start Locally With Conda</h3>
+          <code class="code-block">git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+conda env create -f environment.yml
+conda activate hmm-discovery
+./run_app.sh</code>
+          <p class="startup-note">Open <strong>http://127.0.0.1:8081</strong>. After the app is open, ordinary users work through the interface and do not need to write code.</p>
+        </article>
+        <article class="startup-card">
+          <h3>Start With Docker</h3>
+          <code class="code-block">git clone https://github.com/mbaffour/hmm-discovery.git
+cd hmm-discovery
+docker build -t hmm-discovery .
+docker run --rm -p 8081:8081 hmm-discovery</code>
+          <p class="startup-note">For lab or server use, mount a persistent project folder so runs survive container restarts.</p>
+        </article>
+        <article class="startup-card">
+          <h3>First Demo Run</h3>
+          <ol>
+            <li>Create a new project folder outside the Git repository.</li>
+            <li>Load <code>example_data/demo_protein_family.fasta</code>.</li>
+            <li>Run alignment, HMM build, and self-search validation.</li>
+            <li>Export a ZIP to confirm reports and reproducibility files work.</li>
+          </ol>
+        </article>
+        <article class="startup-card">
+          <h3>First Real Run</h3>
+          <ol>
+            <li>Load curated protein seeds for one family.</li>
+            <li>Confirm clean alignment and seed recovery.</li>
+            <li>Search fast protein databases first.</li>
+            <li>Add INPHARED/RefSeq genomes, GPD, or GVD-AVrC only when the HMM behaves well.</li>
+          </ol>
+        </article>
+        <article class="startup-card">
+          <h3>Single-Genome Scan</h3>
+          <ul>
+            <li>Register one nucleotide FASTA or GenBank file in Database Setup.</li>
+            <li>Select only that custom target in Step 4.</li>
+            <li>Use exhaustive six-frame ORFs for short, overlapping, or annotation-missed genes.</li>
+            <li>Review coordinates, strand, coverage, and synteny placement.</li>
+          </ul>
+        </article>
+        <article class="startup-card">
+          <h3>Long-Run Advice</h3>
+          <ul>
+            <li>Keep large runs outside the Git repository.</li>
+            <li>Use cache cleanup after exports if disk space is tight.</li>
+            <li>On macOS, use <code>caffeinate -dimsu</code> during overnight runs.</li>
+            <li>Save <code>RUN_SUMMARY.md</code>, <code>METHODS_TEXT.txt</code>, and <code>reproducibility.json</code>.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="startup-note">Full reference: <a href="https://github.com/mbaffour/hmm-discovery/blob/main/docs/STARTUP_GUIDE.md">docs/STARTUP_GUIDE.md</a>. The interactive version is in <a href="guide.html">the guided tour</a>.</p>
     </section>
 
     <section class="article-section" id="about">
