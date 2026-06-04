@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HMM Discovery Interactive Guide</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5f6f7f;
+      --line: #d8e0e8;
+      --bg: #f7f9fb;
+      --panel: #ffffff;
+      --accent: #0f766e;
+      --accent2: #365486;
+      --warn: #a16207;
+      --danger: #9f1239;
+      --copper: #b45309;
+      --shadow: 0 18px 48px rgba(23, 32, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(15,118,110,0.08), transparent 28rem),
+        radial-gradient(circle at 92% 6%, rgba(54,84,134,0.09), transparent 32rem),
+        var(--bg);
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+      overflow-x: hidden;
+    }
+    header {
+      padding: 42px 22px 26px;
+      background:
+        linear-gradient(120deg, rgba(238,247,245,0.94), rgba(238,243,251,0.94)),
+        #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+    header div, main { max-width: 1120px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1; letter-spacing: 0; }
+    h2 { margin-top: 0; }
+    p { color: var(--muted); }
+    main { padding: 24px 18px 48px; }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 24px;
+      position: sticky;
+      top: 8px;
+      z-index: 3;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(8px);
+    }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-weight: 650;
+      cursor: pointer;
+      min-height: 38px;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    button.active { background: var(--accent); color: white; border-color: var(--accent); }
+    button:hover { transform: translateY(-1px); border-color: var(--accent); }
+    section.tab {
+      display: none;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+    section.tab.active { display: block; }
+    main > *,
+    section,
+    .card,
+    .guide-visual,
+    .meter-step,
+    .planner-meter,
+    .grid {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      min-width: 0;
+      min-height: 132px;
+      box-shadow: 0 8px 24px rgba(23,32,42,0.04);
+    }
+    .card h3 { line-height: 1.18; margin-top: 0; }
+    .card p { margin-bottom: 0; }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #f0f4f8;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    code { padding: 2px 5px; }
+    pre { overflow: auto; padding: 14px; }
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #fff;
+      margin: 10px 0;
+    }
+    details[open] { border-color: rgba(15,118,110,0.4); box-shadow: 0 8px 20px rgba(15,118,110,0.06); }
+    summary { font-weight: 700; cursor: pointer; }
+    .checklist label { display: block; margin: 8px 0; color: var(--ink); }
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      background: #e6f4f1;
+      color: var(--accent);
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    .warn { color: var(--warn); font-weight: 700; }
+    .hero-guide {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 430px);
+      gap: 22px;
+      align-items: end;
+    }
+    .guide-visual {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      box-shadow: 0 14px 38px rgba(23,32,42,0.08);
+    }
+    .guide-track {
+      position: relative;
+      height: 116px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background:
+        repeating-linear-gradient(90deg, transparent 0 44px, rgba(23,32,42,0.045) 44px 45px),
+        linear-gradient(90deg, #eef7f5, #eef3fb);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .orf { position: absolute; height: 22px; border-radius: 999px 8px 8px 999px; background: var(--accent); }
+    .orf.b { background: var(--accent2); }
+    .orf.c { background: var(--copper); }
+    .planner-meter {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0;
+    }
+    .meter-step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfdff;
+      min-height: 92px;
+    }
+    .meter-step strong { display: block; line-height: 1.18; }
+    .meter-step span { display: block; color: var(--muted); font-size: 0.84rem; line-height: 1.28; margin-top: 5px; }
+    .tab-feedback {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin: -10px 0 16px;
+    }
+    @media (max-width: 780px) {
+      .hero-guide { grid-template-columns: 1fr; }
+      nav { position: static; }
+      .planner-meter { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      main { padding-inline: 14px; }
+      section.tab { padding: 16px; }
+      .planner-meter { grid-template-columns: 1fr; }
+      button { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero-guide">
+      <div>
+        <h1>HMM Discovery</h1>
+        <p>Interactive deployment and user guide for protein-family discovery, phage database search, synteny analysis, and reproducible export.</p>
+        <p><span class="pill">Synthetic demo data included</span><span class="pill">No private research data</span><span class="pill">No-code app runs</span><span class="pill">VOGDB-first annotation</span></p>
+      </div>
+      <div class="guide-visual" aria-label="Genome context and no-code workflow preview">
+        <div class="guide-track">
+          <span class="orf" style="left:8%;top:22px;width:22%;"></span>
+          <span class="orf b" style="left:34%;top:58px;width:16%;"></span>
+          <span class="orf c" style="left:54%;top:34px;width:20%;"></span>
+          <span class="orf" style="left:78%;top:70px;width:14%;"></span>
+        </div>
+        <div class="planner-meter" style="margin:0;">
+          <div class="meter-step"><strong>Choose</strong><span>input and output folder</span></div>
+          <div class="meter-step"><strong>Run</strong><span>alignment, HMM, search</span></div>
+          <div class="meter-step"><strong>Review</strong><span>hits and synteny</span></div>
+          <div class="meter-step"><strong>Export</strong><span>paper-ready files</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main>
+    <nav aria-label="Guide tabs">
+      <button class="active" data-tab="start">Start</button>
+      <button data-tab="workflow">Workflow</button>
+      <button data-tab="databases">Databases</button>
+      <button data-tab="planner">Run Planner</button>
+      <button data-tab="interpret">Interpret</button>
+      <button data-tab="synteny">Synteny</button>
+      <button data-tab="presentation">Presentation</button>
+      <button data-tab="deploy">Deploy</button>
+      <button data-tab="checklist">Checklist</button>
+    </nav>
+    <p class="tab-feedback" id="tab-feedback">Start with a clean demo run, then scale only when the HMM recovers seeds cleanly.</p>
+
+    <section id="start" class="tab active">
+      <h2>Quick Start</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Conda</h3>
+          <pre>conda env create -f environment.yml
+conda activate hmm-discovery
+./run_app.sh</pre>
+        </div>
+        <div class="card">
+          <h3>Docker</h3>
+          <pre>docker build -t hmm-discovery .
+docker run --rm -p 8081:8081 hmm-discovery</pre>
+        </div>
+      </div>
+      <p>Open <code>http://127.0.0.1:8081</code>, create a project, and load <code>example_data/demo_protein_family.fasta</code>.</p>
+      <p>After launch, ordinary users do not need to write code. Project setup, input loading, HMM building, database selection, single-genome scans, six-frame ORF discovery, summaries, cleanup, and export are all available through the app interface.</p>
+    </section>
+
+    <section id="workflow" class="tab">
+      <h2>Research Workflow</h2>
+      <details open><summary>1. Input</summary><p>Load a curated protein seed FASTA for your family. The demo FASTA is synthetic and only checks that the app works.</p></details>
+      <details><summary>2. Alignment and HMM</summary><p>Run MAFFT, trimAl, and HMMER. Inspect seed recovery before searching large databases.</p></details>
+      <details><summary>3. Search</summary><p>Start with protein databases for a fast signal. For a single genome or bring-your-own FASTA run, register the target in <strong>Database Setup -> Add Custom Database / Single Genome Target</strong>. Nucleotide targets can be searched with Prodigal predicted genes or exhaustive six-frame ORFs.</p></details>
+      <details><summary>4. Analysis</summary><p>Review confidence tiers, clusters, motifs, taxonomy, phylogeny, and synteny.</p></details>
+      <details><summary>5. Export</summary><p>Generate a run summary, then download TSVs, figures, report HTML, methods text, reproducibility JSON, and the full ZIP. The export step can also save the ZIP directly to a folder you choose.</p></details>
+    </section>
+
+    <section id="databases" class="tab">
+      <h2>Database Strategy</h2>
+      <p>The app includes registry entries for public databases but not the database files themselves.</p>
+      <div class="grid">
+        <div class="card"><h3>Fast check</h3><p>INPHARED proteins and RefSeq viral proteins are good first searches.</p></div>
+        <div class="card"><h3>Single genome target</h3><p>Register one nucleotide FASTA as a custom database when you want to ask whether a specific genome contains the family.</p></div>
+        <div class="card"><h3>Weird-gene mode</h3><p>Use exhaustive six-frame ORFs for short, overlapping, noncanonical, or annotation-missed genes. Use Prodigal for faster conventional gene prediction.</p></div>
+        <div class="card"><h3>Discovery run</h3><p>INPHARED genomes and RefSeq viral genomes search translated proteins from nucleotide FASTA.</p></div>
+        <div class="card"><h3>Viral annotation</h3><p>Use VOGDB VFAM for preferred viral ortholog/family annotation. It uses HMMER hmmscan and writes <code>vogdb_vfam_annotation.tsv</code>.</p></div>
+        <div class="card"><h3>Reliability</h3><p>Large public files are cached resumably before local search to survive network interruptions.</p></div>
+      </div>
+      <p>VOGDB source: release 230 / RefSeq release 230, 39,585 VFAMs, <code>https://fileshare.csb.univie.ac.at/vog/vog230/vfam.hmm.tar.gz</code> and <code>https://fileshare.csb.univie.ac.at/vog/vog230/vfam.annotations.tsv.gz</code>.</p>
+    </section>
+
+    <section id="planner" class="tab">
+      <h2>Run Planner</h2>
+      <p>Choose the smallest run that answers the question, then scale up only after the HMM behaves well.</p>
+      <div class="planner-meter" aria-label="Recommended run escalation">
+        <div class="meter-step"><strong>1. Demo</strong><span>synthetic FASTA, export check</span></div>
+        <div class="meter-step"><strong>2. Single Genome</strong><span>six-frame ORFs and coordinates</span></div>
+        <div class="meter-step"><strong>3. Fast Biology</strong><span>proteins and Swiss-Prot</span></div>
+        <div class="meter-step"><strong>4. Reviewer Scale</strong><span>genomes, breadth, specificity</span></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h3>Installation check</h3><p>Run the synthetic demo FASTA through input, alignment, HMM build, self-search, and export. This confirms the app and environment are healthy.</p></div>
+        <div class="card"><h3>Single-genome question</h3><p>Register one nucleotide FASTA, select only that database, use exhaustive six-frame ORFs, and inspect coordinate-bearing hits plus synteny placement.</p></div>
+        <div class="card"><h3>Fast biological signal</h3><p>Search INPHARED proteins, RefSeq viral proteins, and Swiss-Prot. This is the fastest way to see whether the HMM has a plausible signal.</p></div>
+        <div class="card"><h3>Reviewer-scale discovery</h3><p>Add INPHARED genomes and RefSeq viral genomes. Use GPD/GVD-AVrC for gut/environmental breadth and RefSeq bacterial proteins for background specificity.</p></div>
+      </div>
+      <p class="warn">Do not start with every database unless you already know the HMM recovers seeds and the output disk has room.</p>
+    </section>
+
+    <section id="interpret" class="tab">
+      <h2>Interpreting Results</h2>
+      <details open><summary>What makes a hit convincing?</summary><p>Look for a strong bit score, low E-value, good HMM coverage, recovery of expected seed behavior, consistent database context, and a genomic neighborhood that makes biological sense.</p></details>
+      <details><summary>What if six-frame finds hits Prodigal missed?</summary><p>That is expected for short, overlapping, noncanonical, or unusual genes. Treat the hit as a candidate and inspect coordinates, strand, coverage, synteny, and translated peptide length.</p></details>
+      <details><summary>What should I cite?</summary><p>Cite HMM Discovery plus every tool and database selected in the run. Use <code>ACKNOWLEDGEMENTS.md</code>, <code>CITATION.cff</code>, <code>METHODS_TEXT.txt</code>, and <code>reproducibility.json</code>.</p></details>
+      <details><summary>What should I not overclaim?</summary><p>Annotation databases suggest family/function context but are not proof of biochemical activity. Borderline hits still need review.</p></details>
+    </section>
+
+    <section id="synteny" class="tab">
+      <h2>Synteny Outputs</h2>
+      <p>Synteny aims to place each hit and recover five upstream and five downstream genes.</p>
+      <ul>
+        <li><code>synteny_table.tsv</code> for spreadsheet and custom plotting workflows.</li>
+        <li><code>synteny_neighborhoods.gff3</code> for genome visualization tools.</li>
+        <li><code>synteny_placement_report.tsv</code> for diagnosing unplaced hits.</li>
+      </ul>
+      <p class="warn">For unpublished genomes, keep project folders private and do not commit outputs.</p>
+    </section>
+
+    <section id="presentation" class="tab">
+      <h2>Presentation Images</h2>
+      <p>Use these 16:9 diagrams in slides, posters, lab meetings, onboarding, or a project website. They contain no private research data.</p>
+      <div class="grid">
+        <div class="card"><h3>Workflow overview</h3><p><a href="presentation/hmm_discovery_workflow_overview.svg">Open SVG</a></p></div>
+        <div class="card"><h3>No-code user journey</h3><p><a href="presentation/hmm_discovery_no_code_user_journey.svg">Open SVG</a></p></div>
+        <div class="card"><h3>Database strategy</h3><p><a href="presentation/hmm_discovery_database_strategy.svg">Open SVG</a></p></div>
+        <div class="card"><h3>Outputs and reproducibility</h3><p><a href="presentation/hmm_discovery_outputs_reproducibility.svg">Open SVG</a></p></div>
+      </div>
+      <p>SVG files are best for crisp scalable slides. PNG exports are included when the local renderer is available.</p>
+    </section>
+
+    <section id="deploy" class="tab">
+      <h2>Deployment Notes</h2>
+      <div class="grid">
+        <div class="card"><h3>Single lab machine</h3><p>Use conda or mamba, launch with <code>./run_app.sh</code>, and keep project directories on a large local disk.</p></div>
+        <div class="card"><h3>Shared server</h3><p>Run behind institutional authentication and mount a persistent project volume.</p></div>
+        <div class="card"><h3>Container</h3><p>Use the Dockerfile for reproducible installations across devices.</p></div>
+      </div>
+      <h3>All-Database Validation</h3>
+      <p>In the app, open <strong>Database Setup</strong> and expand <strong>All-Database Research Validation</strong>. Use <strong>Dry-Run Expansion</strong> first, then <strong>Start / Resume</strong>. The app displays the manifest, PID, per-database status, and live log.</p>
+      <p class="warn">For nucleotide databases, use exhaustive six-frame ORFs for discovery validation. Prodigal is available as a faster conventional annotation baseline, but it can miss the weird genes this tool is designed to find.</p>
+      <p>After a run, open <strong>Step 9 -> Run Summary</strong> to create <code>RUN_SUMMARY.md</code> and <code>run_summary.json</code> with inputs, settings, database statuses, hit counts, confidence tiers, synteny status, and key output files.</p>
+      <p>A release is core-discovery ready when required discovery databases pass and optional annotation databases are recorded as complete, failed, skipped, or partial with a clear reason. VOGDB VFAM is the supported viral ortholog annotation route.</p>
+      <p>For methods and citation hygiene, include the repository citation plus every tool and database selected in the run. The release bundle includes <code>docs/METHODOLOGY.md</code>, <code>ACKNOWLEDGEMENTS.md</code>, and <code>CITATION.cff</code>, while run exports include <code>METHODS_TEXT.txt</code> and <code>reproducibility.json</code>.</p>
+      <p>Seed/input FASTA files are not auto-registered as databases; the registry contains public databases plus only custom databases a user explicitly adds.</p>
+    </section>
+
+    <section id="checklist" class="tab">
+      <h2>Pre-Publish Checklist</h2>
+      <div class="checklist">
+        <label><input type="checkbox"> No private FASTA, GenBank, logs, results, or database files are committed.</label>
+        <label><input type="checkbox"> <code>python -m compileall -q app.py core ui pipeline</code> passes.</label>
+        <label><input type="checkbox"> Environment check reports <code>all_full_run_ok</code>.</label>
+        <label><input type="checkbox"> Demo FASTA runs through alignment, HMM build, validation, and export.</label>
+        <label><input type="checkbox"> Single-genome nucleotide run works with exhaustive six-frame ORFs and preserves hit coordinates.</label>
+        <label><input type="checkbox"> Export ZIP can be saved to a user-selected folder.</label>
+        <label><input type="checkbox"> Step 9 Run Summary creates <code>RUN_SUMMARY.md</code> and <code>run_summary.json</code>.</label>
+        <label><input type="checkbox"> App benchmark panel dry-run creates a manifest and log.</label>
+        <label><input type="checkbox"> All-database benchmark finishes or records explicit statuses for every registered database.</label>
+        <label><input type="checkbox"> Database list contains no seed/input FASTA entries.</label>
+        <label><input type="checkbox"> README, deployment checklist, and blog post are reviewed.</label>
+        <label><input type="checkbox"> Website landing page, interactive guide, methodology document, acknowledgements, and citation metadata are reviewed.</label>
+      </div>
+    </section>
+  </main>
+  <script>
+    const buttons = [...document.querySelectorAll("button[data-tab]")];
+    const tabs = [...document.querySelectorAll("section.tab")];
+    const feedback = document.getElementById("tab-feedback");
+    const messages = {
+      start: "Start with a clean demo run, then scale only when the HMM recovers seeds cleanly.",
+      workflow: "Follow the same scientific story every time: input, build, search, review, export.",
+      databases: "Pick databases for the question. The app does not download everything unless you ask it to.",
+      planner: "Choose the smallest run that answers the question, then add breadth and specificity checks.",
+      interpret: "Annotation is context, not proof. Good hits earn confidence from scores, coverage, and biology.",
+      synteny: "Synteny exports are designed for downstream plotting and manual review.",
+      presentation: "These graphics are safe for slides because they contain no unpublished sequences.",
+      deploy: "For deployment, keep private runs out of the Git repository and preserve reproducibility files.",
+      checklist: "Use this list before GitHub upload or shared-lab deployment."
+    };
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        buttons.forEach((b) => b.classList.remove("active"));
+        tabs.forEach((t) => t.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(button.dataset.tab).classList.add("active");
+        if (feedback) feedback.textContent = messages[button.dataset.tab] || "";
+      });
+    });
+  </script>
+</body>
+</html>

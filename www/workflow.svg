@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 780" font-family="'Segoe UI', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#6c757d"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#28a745"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#007bff"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="780" fill="#1a1d21" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="34" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">HMM Protein Family Discovery — Workflow</text>
+  <text x="450" y="52" text-anchor="middle" font-size="11" fill="#6c757d">Profile HMM-based homolog discovery · Any protein family · Phage / Bacterial / Generic</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       COLUMN HEADERS
+  ══════════════════════════════════════════════════════════ -->
+  <text x="180" y="78" text-anchor="middle" font-size="10" fill="#adb5bd" font-weight="600" letter-spacing="1">INPUT</text>
+  <text x="450" y="78" text-anchor="middle" font-size="10" fill="#adb5bd" font-weight="600" letter-spacing="1">PIPELINE STEPS</text>
+  <text x="750" y="78" text-anchor="middle" font-size="10" fill="#adb5bd" font-weight="600" letter-spacing="1">OUTPUTS</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       INPUT BOX
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="60" y="88" width="240" height="90" rx="8" fill="#212529" stroke="#495057" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="180" y="108" text-anchor="middle" font-size="12" font-weight="700" fill="#f8f9fa">📥  Input Sequences</text>
+  <text x="180" y="126" text-anchor="middle" font-size="10" fill="#adb5bd">Protein FASTA  ·  Nucleotide FASTA</text>
+  <text x="180" y="141" text-anchor="middle" font-size="10" fill="#adb5bd">GenBank  ·  .gz  ·  Folder (batch)</text>
+  <text x="180" y="158" text-anchor="middle" font-size="10" fill="#20c997">Auto-detects protein vs nucleotide</text>
+
+  <!-- Arrow: Input → Step 1 -->
+  <line x1="300" y1="133" x2="338" y2="133" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 1 — ORF PREDICTION (conditional)
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="88" width="220" height="52" rx="8" fill="#1e3a4a" stroke="#0d6efd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="108" text-anchor="middle" font-size="12" font-weight="700" fill="#0dcaf0">①  ORF Prediction</text>
+  <text x="450" y="124" text-anchor="middle" font-size="10" fill="#adb5bd">Prodigal (prokaryotes)  ·  6-frame translation</text>
+  <text x="450" y="138" text-anchor="middle" font-size="9" fill="#6c757d" font-style="italic">nucleotide input only</text>
+
+  <!-- Arrow: Step 1 → Step 2 -->
+  <line x1="450" y1="140" x2="450" y2="158" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 2 — MSA
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="160" width="220" height="60" rx="8" fill="#1e3a2a" stroke="#198754" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="180" text-anchor="middle" font-size="12" font-weight="700" fill="#20c997">②  Multiple Sequence Alignment</text>
+  <text x="450" y="196" text-anchor="middle" font-size="10" fill="#adb5bd">MAFFT  ·  Clustal Omega</text>
+  <text x="450" y="210" text-anchor="middle" font-size="10" fill="#adb5bd">trimAl column trimming</text>
+
+  <!-- Output: MSA -->
+  <rect x="600" y="167" width="160" height="28" rx="5" fill="#2a2d31" stroke="#495057" stroke-width="1"/>
+  <text x="680" y="185" text-anchor="middle" font-size="9" fill="#adb5bd">seeds_trimmed.faa</text>
+  <line x1="560" y1="185" x2="598" y2="185" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Arrow: Step 2 → Step 3 -->
+  <line x1="450" y1="220" x2="450" y2="238" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 3 — HMM BUILD
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="240" width="220" height="60" rx="8" fill="#3a2a1e" stroke="#fd7e14" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="260" text-anchor="middle" font-size="12" font-weight="700" fill="#fd7e14">③  Build Profile HMM</text>
+  <text x="450" y="276" text-anchor="middle" font-size="10" fill="#adb5bd">hmmbuild  ·  HMM logo</text>
+  <text x="450" y="290" text-anchor="middle" font-size="10" fill="#adb5bd">Self-search validation</text>
+
+  <!-- Output: HMM -->
+  <rect x="600" y="247" width="160" height="28" rx="5" fill="#2a2d31" stroke="#495057" stroke-width="1"/>
+  <text x="680" y="265" text-anchor="middle" font-size="9" fill="#adb5bd">profile.hmm  ·  hmm_logo.png</text>
+  <line x1="560" y1="265" x2="598" y2="265" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Arrow: Step 3 → Step 4 -->
+  <line x1="450" y1="300" x2="450" y2="318" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 4 — DATABASE SEARCH
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="320" width="220" height="72" rx="8" fill="#2a1e3a" stroke="#6f42c1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="341" text-anchor="middle" font-size="12" font-weight="700" fill="#a855f7">④  Database Search</text>
+  <text x="450" y="357" text-anchor="middle" font-size="10" fill="#adb5bd">hmmsearch  ·  --tblout  ·  --domtblout</text>
+  <text x="450" y="372" text-anchor="middle" font-size="9" fill="#adb5bd">INPHARED · GPD · MGV · RefSeq</text>
+  <text x="450" y="386" text-anchor="middle" font-size="9" fill="#20c997">Download on-demand or stream live</text>
+
+  <!-- Database icons left side -->
+  <rect x="60" y="330" width="240" height="62" rx="8" fill="#212529" stroke="#495057" stroke-width="1"/>
+  <text x="180" y="349" text-anchor="middle" font-size="10" font-weight="700" fill="#f8f9fa">🗄️  Database Registry</text>
+  <text x="180" y="364" text-anchor="middle" font-size="9" fill="#20c997">🟢 Streaming  —  no download needed</text>
+  <text x="180" y="377" text-anchor="middle" font-size="9" fill="#0dcaf0">⬇️ Download on-demand  (inline)</text>
+  <text x="180" y="390" text-anchor="middle" font-size="9" fill="#adb5bd">+ Register any custom database</text>
+  <line x1="300" y1="361" x2="338" y2="361" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Output: raw hits -->
+  <rect x="600" y="327" width="160" height="40" rx="5" fill="#2a2d31" stroke="#495057" stroke-width="1"/>
+  <text x="680" y="345" text-anchor="middle" font-size="9" fill="#adb5bd">hits.tblout</text>
+  <text x="680" y="359" text-anchor="middle" font-size="9" fill="#adb5bd">hits.domtblout</text>
+  <line x1="560" y1="356" x2="598" y2="356" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Arrow: Step 4 → Step 5 -->
+  <line x1="450" y1="392" x2="450" y2="410" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 5 — CONFIDENCE CLASSIFICATION
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="412" width="220" height="72" rx="8" fill="#2a1a1a" stroke="#dc3545" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="432" text-anchor="middle" font-size="12" font-weight="700" fill="#f87171">⑤  Confidence Classification</text>
+  <text x="450" y="448" text-anchor="middle" font-size="10" fill="#adb5bd">Bit score · E-value · HMM coverage</text>
+  <text x="450" y="462" text-anchor="middle" font-size="9" fill="#adb5bd">Domain architecture · Reciprocal search</text>
+  <text x="450" y="476" text-anchor="middle" font-size="9" fill="#adb5bd">Taxonomic consistency · QC flags</text>
+  <text x="450" y="490" text-anchor="middle" font-size="8" fill="#6c757d">→ High-confidence · Putative · Divergent · Likely-FP</text>
+
+  <!-- Controls block left -->
+  <rect x="60" y="418" width="240" height="62" rx="8" fill="#212529" stroke="#495057" stroke-width="1"/>
+  <text x="180" y="438" text-anchor="middle" font-size="10" font-weight="700" fill="#f8f9fa">🎯  Score Calibration</text>
+  <text x="180" y="453" text-anchor="middle" font-size="9" fill="#adb5bd">Custom pos/neg sets</text>
+  <text x="180" y="466" text-anchor="middle" font-size="9" fill="#adb5bd">Built-in taxon controls</text>
+  <text x="180" y="479" text-anchor="middle" font-size="9" fill="#adb5bd">Sensitivity · Specificity · FPR</text>
+  <line x1="300" y1="449" x2="338" y2="449" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Arrow: Step 5 → Step 6 -->
+  <line x1="450" y1="484" x2="450" y2="502" stroke="#6c757d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 6 — ITERATIVE REFINEMENT (loop)
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="340" y="504" width="220" height="60" rx="8" fill="#1e2a3a" stroke="#0d6efd" stroke-width="1.5" filter="url(#shadow)" stroke-dasharray="5,3"/>
+  <text x="450" y="524" text-anchor="middle" font-size="12" font-weight="700" fill="#6ea8fe">⑥  Iterative Refinement</text>
+  <text x="450" y="540" text-anchor="middle" font-size="10" fill="#adb5bd">Add hits → re-align → rebuild HMM</text>
+  <text x="450" y="554" text-anchor="middle" font-size="9" fill="#adb5bd">Manual curation diff · Convergence plot</text>
+
+  <!-- Loop arrow back to Step 2 -->
+  <path d="M 340 534 Q 280 534 280 190 Q 280 165 338 165" stroke="#0d6efd" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#arrow-blue)"/>
+  <text x="258" y="360" text-anchor="middle" font-size="9" fill="#6ea8fe" transform="rotate(-90, 258, 360)">iterate until convergence</text>
+
+  <!-- Arrow: Step 6 → Step 7 -->
+  <line x1="450" y1="564" x2="450" y2="582" stroke="#28a745" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEP 7 — ANALYSIS
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="310" y="584" width="280" height="62" rx="8" fill="#1e3a2a" stroke="#198754" stroke-width="2" filter="url(#shadow)"/>
+  <text x="450" y="605" text-anchor="middle" font-size="12" font-weight="700" fill="#20c997">⑦  Post-Discovery Analysis</text>
+  <text x="450" y="621" text-anchor="middle" font-size="9.5" fill="#adb5bd">Synteny browser  ·  Taxonomy Sankey</text>
+  <text x="450" y="635" text-anchor="middle" font-size="9.5" fill="#adb5bd">Phylogenetic tree  ·  Presence/absence matrix</text>
+  <text x="450" y="648" text-anchor="middle" font-size="9" fill="#6c757d">Clusters · Motifs · Structure (optional)</text>
+
+  <!-- Arrow: Step 7 → Export -->
+  <line x1="450" y1="646" x2="450" y2="664" stroke="#28a745" stroke-width="2" marker-end="url(#arrow-green)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       EXPORT
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="310" y="666" width="280" height="56" rx="8" fill="#1a2a1a" stroke="#198754" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="450" y="686" text-anchor="middle" font-size="12" font-weight="700" fill="#20c997">⑧  Export</text>
+  <text x="450" y="702" text-anchor="middle" font-size="9.5" fill="#adb5bd">TSV/CSV/Excel  ·  FASTA  ·  SVG/PNG figures</text>
+  <text x="450" y="716" text-anchor="middle" font-size="9.5" fill="#adb5bd">HTML report  ·  reproducibility.json  ·  METHODS_TEXT.txt</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       RIGHT-SIDE OUTPUT BOXES — Analysis + Export
+  ══════════════════════════════════════════════════════════ -->
+  <!-- Hits table output -->
+  <rect x="600" y="420" width="245" height="56" rx="5" fill="#2a2d31" stroke="#495057" stroke-width="1"/>
+  <text x="722" y="438" text-anchor="middle" font-size="9" font-weight="600" fill="#f8f9fa">Results Table</text>
+  <text x="722" y="452" text-anchor="middle" font-size="9" fill="#20c997">hits_main.tsv</text>
+  <text x="722" y="465" text-anchor="middle" font-size="9" fill="#adb5bd">confidence_tier · why_classified · qc_flags</text>
+  <line x1="560" y1="448" x2="598" y2="448" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Analysis outputs -->
+  <rect x="600" y="490" width="245" height="100" rx="5" fill="#2a2d31" stroke="#495057" stroke-width="1"/>
+  <text x="722" y="508" text-anchor="middle" font-size="9" font-weight="600" fill="#f8f9fa">Analysis Outputs</text>
+  <text x="722" y="522" text-anchor="middle" font-size="9" fill="#20c997">synteny_map.svg  ·  synteny_table.tsv</text>
+  <text x="722" y="536" text-anchor="middle" font-size="9" fill="#adb5bd">synteny_neighborhoods.gff3</text>
+  <text x="722" y="550" text-anchor="middle" font-size="9" fill="#0dcaf0">tree.treefile  ·  tree.svg</text>
+  <text x="722" y="564" text-anchor="middle" font-size="9" fill="#adb5bd">taxonomy_sankey.svg  ·  heatmap.png</text>
+  <text x="722" y="578" text-anchor="middle" font-size="9" fill="#adb5bd">hits_proteins.faa  ·  hits_aligned.faa</text>
+  <line x1="590" y1="615" x2="598" y2="540" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- Export outputs -->
+  <rect x="600" y="606" width="245" height="56" rx="5" fill="#2a2d31" stroke="#198754" stroke-width="1"/>
+  <text x="722" y="624" text-anchor="middle" font-size="9" font-weight="600" fill="#f8f9fa">Reproducibility Package</text>
+  <text x="722" y="638" text-anchor="middle" font-size="9" fill="#20c997">reproducibility.json  ·  audit_trail.jsonl</text>
+  <text x="722" y="652" text-anchor="middle" font-size="9" fill="#adb5bd">METHODS_TEXT.txt  ·  summary_report.html</text>
+  <line x1="590" y1="694" x2="598" y2="634" stroke="#6c757d" stroke-width="1" marker-end="url(#arrow)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       LEGEND
+  ══════════════════════════════════════════════════════════ -->
+  <rect x="60" y="660" width="240" height="62" rx="8" fill="#212529" stroke="#495057" stroke-width="1"/>
+  <text x="180" y="678" text-anchor="middle" font-size="10" font-weight="700" fill="#f8f9fa">Confidence Tiers</text>
+  <circle cx="80" cy="691" r="5" fill="#28a745"/>
+  <text x="92" y="695" font-size="9" fill="#adb5bd">High-confidence homolog</text>
+  <circle cx="80" cy="706" r="5" fill="#0d6efd"/>
+  <text x="92" y="710" font-size="9" fill="#adb5bd">Putative homolog</text>
+  <circle cx="160" cy="691" r="5" fill="#fd7e14"/>
+  <text x="172" y="695" font-size="9" fill="#adb5bd">Divergent candidate</text>
+  <circle cx="160" cy="706" r="5" fill="#dc3545"/>
+  <text x="172" y="710" font-size="9" fill="#adb5bd">Likely false positive</text>
+
+  <!-- Footer -->
+  <text x="450" y="760" text-anchor="middle" font-size="9" fill="#495057">All steps resume-able · Audit trail logged · Tool versions recorded · Methods auto-generated</text>
+</svg>

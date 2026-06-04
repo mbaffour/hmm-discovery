@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use HMM Discovery, please cite this software and the underlying tools/databases used in your specific run."
+title: "HMM Discovery"
+type: software
+authors:
+  - family-names: "Awuah"
+    given-names: "Michael"
+license: MIT
+version: "1.0.0"
+date-released: "2026-06-04"
+repository-code: "https://github.com/mbaffour/hmm-discovery"
+abstract: "A Python Shiny application for protein-family profile-HMM discovery, public database search, hit classification, synteny analysis, and reproducible export."
+keywords:
+  - profile HMM
+  - HMMER
+  - phage genomics
+  - synteny
+  - viral orthologs
+  - bioinformatics workflow
+preferred-citation:
+  type: software
+  title: "HMM Discovery"
+  authors:
+    - family-names: "Awuah"
+      given-names: "Michael"
+  repository-code: "https://github.com/mbaffour/hmm-discovery"
+  license: MIT
+  notes: "Also cite HMMER, MAFFT, trimAl, Prodigal, seqkit, IQ-TREE, MEME Suite, CD-HIT/MMseqs2, INPHARED, UniProt/Swiss-Prot, NCBI RefSeq, GPD, GVD-AVrC, Pfam, VOGDB, and all databases selected in the run."

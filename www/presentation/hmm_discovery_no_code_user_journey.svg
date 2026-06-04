@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">No-code user journey in HMM Discovery</title>
+  <desc id="desc">A presentation diagram showing that users can run HMM Discovery through app buttons without writing code.</desc>
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .band { fill: #f6f8fb; }
+      .title { font: 800 58px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17202a; }
+      .subtitle { font: 400 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536471; }
+      .phase { font: 800 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17202a; }
+      .body { font: 400 21px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536471; }
+      .button-text { font: 800 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #ffffff; }
+      .card { fill: #ffffff; stroke: #d9e2ea; stroke-width: 2; rx: 18; }
+      .screen { fill: #17202a; rx: 24; }
+      .ui { fill: #ffffff; rx: 12; }
+      .accent { fill: #0f766e; rx: 10; }
+      .line { stroke: #d9e2ea; stroke-width: 4; stroke-linecap: round; }
+      .arrow { stroke: #0f766e; stroke-width: 6; fill: none; marker-end: url(#arrowhead); }
+      .note { font: 800 24px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #115e59; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#0f766e"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1920" height="1080"/>
+  <rect class="band" x="0" y="0" width="1920" height="215"/>
+  <text class="title" x="96" y="105">No-Code App Runs</text>
+  <text class="subtitle" x="98" y="153">Scientists can run the workflow from the app: select, click, review, export.</text>
+
+  <g transform="translate(104 280)">
+    <rect class="screen" x="0" y="0" width="520" height="570"/>
+    <rect class="ui" x="32" y="42" width="456" height="486"/>
+    <rect class="accent" x="62" y="82" width="160" height="34"/>
+    <line class="line" x1="62" y1="158" x2="420" y2="158"/>
+    <line class="line" x1="62" y1="206" x2="420" y2="206"/>
+    <line class="line" x1="62" y1="254" x2="360" y2="254"/>
+    <rect class="accent" x="62" y="324" width="184" height="52"/>
+    <text class="button-text" x="88" y="358">Start / Resume</text>
+    <rect fill="#284b8f" x="268" y="324" width="150" height="52" rx="10"/>
+    <text class="button-text" x="303" y="358">Export</text>
+    <text class="body" x="64" y="458">Project controls, setup checks,</text>
+    <text class="body" x="64" y="490">database choices, and run logs</text>
+  </g>
+
+  <g transform="translate(720 270)">
+    <rect class="card" x="0" y="0" width="1050" height="112"/>
+    <text class="phase" x="34" y="44">1. Create project and choose outputs</text>
+    <text class="body" x="34" y="78">Keep private data and large results outside the public repository.</text>
+    <path class="arrow" d="M526 122 L526 168"/>
+
+    <rect class="card" x="0" y="180" width="1050" height="112"/>
+    <text class="phase" x="34" y="224">2. Upload FASTA or register a genome</text>
+    <text class="body" x="34" y="258">Use seed proteins for HMM building or custom FASTA for target scans.</text>
+    <path class="arrow" d="M526 302 L526 348"/>
+
+    <rect class="card" x="0" y="360" width="1050" height="112"/>
+    <text class="phase" x="34" y="404">3. Click alignment, HMM build, and search</text>
+    <text class="body" x="34" y="438">No command line is needed for routine runs, database setup, or exports.</text>
+    <path class="arrow" d="M526 482 L526 528"/>
+
+    <rect class="card" x="0" y="540" width="1050" height="112"/>
+    <text class="phase" x="34" y="584">4. Review, clean cache, and export</text>
+    <text class="body" x="34" y="618">Create reports, provenance, citation guidance, and a reusable ZIP.</text>
+  </g>
+
+  <rect x="720" y="945" width="1050" height="72" rx="18" fill="#e6f4f1" stroke="#b7ddd7" stroke-width="2"/>
+  <text class="note" x="754" y="990">CLI commands remain optional for administrators, servers, and advanced automation.</text>
+</svg>

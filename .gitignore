@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environments
+.env
+*.env
+
+# Project outputs (user-generated)
+HMM_Projects/
+*.hmm
+*.fai
+search_results/
+results/
+figures/
+logs/
+alignments/
+hmm/
+reports/
+trees/
+motifs/
+clusters/
+databases/*.fa
+databases/*.faa
+databases/*.fna
+databases/*.fasta
+databases/*.gz
+*.tblout
+*.domtblout
+*.out
+*.treefile
+*.zip
+.pipeline_state.json
+
+# Conda
+*.conda
+*.tar.bz2
+
+# Shiny session data
+.shiny_session/

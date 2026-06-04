@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">HMM Discovery outputs and reproducibility</title>
+  <desc id="desc">A presentation diagram showing the output package created by HMM Discovery for review and reuse.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f6f8fb; }
+      .title { font: 800 62px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17202a; }
+      .subtitle { font: 400 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536471; }
+      .heading { font: 800 32px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17202a; }
+      .body { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536471; }
+      .file { font: 800 24px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #17202a; }
+      .card { fill: #ffffff; stroke: #d9e2ea; stroke-width: 2; rx: 18; }
+      .zip { fill: #0f766e; rx: 24; }
+      .zip-text { font: 800 42px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #ffffff; }
+      .icon { fill: #e6f4f1; stroke: #b7ddd7; stroke-width: 2; rx: 12; }
+      .accent1 { fill: #284b8f; }
+      .accent2 { fill: #0f766e; }
+      .accent3 { fill: #9a6700; }
+      .accent4 { fill: #9f1239; }
+      .line { stroke: #d9e2ea; stroke-width: 4; stroke-linecap: round; }
+    </style>
+  </defs>
+  <rect class="bg" width="1920" height="1080"/>
+  <text class="title" x="96" y="106">Export Package For Review And Reuse</text>
+  <text class="subtitle" x="98" y="153">Each run can leave a compact evidence trail: hits, context, methods, provenance, and plots.</text>
+
+  <g transform="translate(120 240)">
+    <rect class="card" x="0" y="0" width="760" height="620"/>
+    <text class="heading" x="42" y="64">Research Tables</text>
+    <rect class="icon" x="42" y="112" width="84" height="70"/><rect class="accent1" x="58" y="130" width="52" height="8"/><rect class="accent1" x="58" y="150" width="52" height="8"/>
+    <text class="file" x="154" y="150">hits_main.tsv</text>
+    <text class="body" x="154" y="184">all HMM search hits and confidence fields</text>
+    <rect class="icon" x="42" y="232" width="84" height="70"/><rect class="accent2" x="58" y="250" width="52" height="8"/><rect class="accent2" x="58" y="270" width="52" height="8"/>
+    <text class="file" x="154" y="270">hits_best_per_genome.tsv</text>
+    <text class="body" x="154" y="304">one clean representative per genome</text>
+    <rect class="icon" x="42" y="352" width="84" height="70"/><rect class="accent3" x="58" y="370" width="52" height="8"/><rect class="accent3" x="58" y="390" width="52" height="8"/>
+    <text class="file" x="154" y="390">synteny_table.tsv</text>
+    <text class="body" x="154" y="424">five upstream and five downstream genes when placed</text>
+    <rect class="icon" x="42" y="472" width="84" height="70"/><rect class="accent4" x="58" y="490" width="52" height="8"/><rect class="accent4" x="58" y="510" width="52" height="8"/>
+    <text class="file" x="154" y="510">vogdb_vfam_annotation.tsv</text>
+    <text class="body" x="154" y="544">viral ortholog/family annotation when selected</text>
+  </g>
+
+  <g transform="translate(1040 240)">
+    <rect class="card" x="0" y="0" width="760" height="620"/>
+    <text class="heading" x="42" y="64">Reproducibility Files</text>
+    <rect class="icon" x="42" y="112" width="84" height="70"/><line class="line" x1="58" y1="134" x2="110" y2="134"/><line class="line" x1="58" y1="156" x2="100" y2="156"/>
+    <text class="file" x="154" y="150">METHODS_TEXT.txt</text>
+    <text class="body" x="154" y="184">manuscript-ready method summary</text>
+    <rect class="icon" x="42" y="232" width="84" height="70"/><line class="line" x1="58" y1="254" x2="110" y2="254"/><line class="line" x1="58" y1="276" x2="100" y2="276"/>
+    <text class="file" x="154" y="270">reproducibility.json</text>
+    <text class="body" x="154" y="304">versions, settings, database provenance, citations</text>
+    <rect class="icon" x="42" y="352" width="84" height="70"/><line class="line" x1="58" y1="374" x2="110" y2="374"/><line class="line" x1="58" y1="396" x2="100" y2="396"/>
+    <text class="file" x="154" y="390">RUN_SUMMARY.md</text>
+    <text class="body" x="154" y="424">plain-language run summary and top results</text>
+    <rect class="zip" x="42" y="490" width="270" height="86"/>
+    <text class="zip-text" x="82" y="546">export ZIP</text>
+    <text class="body" x="342" y="524">A portable package for collaborators,</text>
+    <text class="body" x="342" y="558">reviewers, and future reruns.</text>
+  </g>
+
+  <text class="body" x="120" y="975">Good practice: keep private sequences and raw database caches out of GitHub; share only sanitized documentation and intended release assets.</text>
+</svg>

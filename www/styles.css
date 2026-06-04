@@ -1,0 +1,531 @@
+/* HMM Discovery App — Custom Styles */
+
+/* ── Suppress Shiny's busy-state dimming ─────────────────────────────────────
+   Shiny reduces opacity on ALL outputs while any async reactive runs, causing
+   a jarring colour shift on the darkly theme.  We kill the dimming entirely
+   and replace it with a thin animated progress bar at the top of the page.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Reduce the harsh grey-out to a subtle dim (still visible = things are running) */
+.shiny-bound-output.recalculating,
+.html-fill-item.recalculating,
+.shiny-plot-output.recalculating,
+.shiny-text-output.recalculating,
+.shiny-data-frame-output.recalculating {
+  opacity: 0.85 !important;
+  transition: opacity 0.3s ease !important;
+}
+
+/* Page-level: subtle dim, not invisible */
+body.shiny-busy > .bslib-page-fill {
+  opacity: 0.9 !important;
+}
+
+/* Change cursor to 'wait' so users still know something is running */
+body.shiny-busy {
+  cursor: wait;
+}
+
+/* Animated progress bar at the very top — visible but non-intrusive */
+body.shiny-busy::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, #375a7f 0%, #3498db 40%, #00bc8c 70%, #375a7f 100%);
+  background-size: 300% 100%;
+  animation: hmm-progress 1.4s ease-in-out infinite;
+  z-index: 99999;
+  pointer-events: none;
+}
+@keyframes hmm-progress {
+  0%   { background-position: 100% 0 }
+  100% { background-position: -100% 0 }
+}
+
+:root {
+  --color-high-confidence: #198754;
+  --color-putative: #0d6efd;
+  --color-divergent: #fd7e14;
+  --color-likely-fp: #dc3545;
+  --sidebar-width: 280px;
+  --surface-subtle: rgba(255,255,255,0.065);
+  --surface-border: rgba(255,255,255,0.16);
+  --hmm-ink: #f8fafc;
+  --hmm-muted: rgba(248,250,252,0.72);
+  --hmm-teal: #14b8a6;
+  --hmm-blue: #60a5fa;
+  --hmm-copper: #f59e0b;
+  --hmm-card-bg: rgba(255,255,255,0.06);
+  --hmm-card-border: rgba(255,255,255,0.14);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+
+.bslib-page-fill {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(20,184,166,0.08), transparent 26rem),
+    radial-gradient(circle at 88% 4%, rgba(96,165,250,0.08), transparent 28rem),
+    #111827;
+}
+
+.card,
+.accordion,
+.accordion-item,
+.modal-content {
+  border-radius: 8px !important;
+}
+
+.card {
+  overflow: hidden;
+  border-color: var(--hmm-card-border) !important;
+  box-shadow: 0 14px 38px rgba(0,0,0,0.12);
+}
+
+.card-header {
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.card-body,
+.accordion-body,
+.modal-body,
+.tab-content {
+  min-width: 0;
+}
+
+p,
+li,
+small,
+label,
+.form-label,
+.database-relevance,
+.learning-card,
+.guidance-callout,
+.card,
+.accordion,
+.table,
+.shiny-bound-output {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.btn,
+button,
+.nav-link,
+.badge {
+  letter-spacing: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.btn {
+  border-radius: 6px;
+  font-weight: 650;
+  min-height: 34px;
+}
+
+.btn-primary,
+.btn-success {
+  box-shadow: 0 8px 22px rgba(20,184,166,0.12);
+}
+
+.table {
+  table-layout: auto;
+}
+
+.table td,
+.table th {
+  vertical-align: top;
+  max-width: 32rem;
+}
+
+.shiny-html-output table,
+.shiny-bound-output table {
+  width: 100%;
+}
+
+.shiny-html-output,
+.shiny-bound-output {
+  min-width: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+.bslib-sidebar-layout > .sidebar {
+  min-width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
+}
+
+.bslib-sidebar-layout > .main,
+.bslib-sidebar-layout .bslib-page-main {
+  min-width: 0 !important;
+  max-width: calc(100vw - var(--sidebar-width) - 24px) !important;
+  overflow-x: hidden;
+}
+
+.bslib-sidebar-layout .tab-content,
+.bslib-sidebar-layout .tab-pane,
+.bslib-sidebar-layout .container-fluid {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.sidebar-mode-section {
+  border-top: 1px solid rgba(255,255,255,0.15);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+
+.workflow-coach {
+  border: 1px solid rgba(255,255,255,0.16);
+  background:
+    linear-gradient(145deg, rgba(20,184,166,0.12), rgba(96,165,250,0.06)),
+    rgba(255,255,255,0.055);
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem;
+}
+.workflow-coach ul {
+  line-height: 1.35;
+}
+
+/* ── Nav pills in sidebar ────────────────────────────────────── */
+.step-nav .nav-link {
+  border-radius: 6px;
+  margin-bottom: 2px;
+  font-size: 0.88rem;
+  padding: 0.35rem 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.step-nav .nav-link.active {
+  background: linear-gradient(135deg, #0f766e, #284b8f);
+  color: #fff;
+}
+.step-nav .nav-link .step-status {
+  font-size: 0.75rem;
+  flex: 0 0 auto;
+}
+
+/* ── Log output pane ─────────────────────────────────────────── */
+.shiny-text-output.log-output {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "Cascadia Mono", "Fira Code", "Consolas", monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Confidence tier colours ─────────────────────────────────── */
+.tier-high_confidence { color: var(--color-high-confidence); font-weight: 600; }
+.tier-putative        { color: var(--color-putative); }
+.tier-divergent       { color: var(--color-divergent); }
+.tier-likely_fp       { color: var(--color-likely-fp); }
+
+/* ── Stat cards row ──────────────────────────────────────────── */
+.stat-cards-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.stat-cards-row .card {
+  flex: 1 1 120px;
+  min-width: 100px;
+}
+
+/* ── Educational guidance blocks ─────────────────────────────────────── */
+.learning-card,
+.guidance-callout {
+  border: 1px solid var(--surface-border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.035)),
+    var(--surface-subtle);
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.75rem;
+  min-height: 100%;
+}
+.learning-card ul {
+  line-height: 1.42;
+  margin-top: 0.25rem;
+}
+.learning-card-info,
+.callout-info {
+  border-left-color: var(--hmm-blue);
+}
+.learning-card-success,
+.callout-success {
+  border-left-color: var(--hmm-teal);
+}
+.learning-card-warning,
+.callout-warning {
+  border-left-color: var(--hmm-copper);
+}
+.learning-card-secondary,
+.callout-secondary {
+  border-left-color: #95a5a6;
+}
+.callout-danger {
+  border-left-color: #e74c3c;
+}
+.guidance-callout .small,
+.learning-card .small {
+  color: rgba(255,255,255,0.76);
+}
+
+/* ── Database status cards ───────────────────────────────────── */
+.db-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+.database-relevance {
+  max-width: 58rem;
+  line-height: 1.32;
+}
+
+.database-relevance + .database-caveat {
+  margin-top: 0.35rem;
+}
+
+.database-caveat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.database-caveat .badge {
+  background: rgba(20,184,166,0.12);
+  border: 1px solid rgba(20,184,166,0.28);
+  color: #8ff3e8;
+}
+
+.db-card-grid .card,
+.database-row-card {
+  min-width: 0;
+}
+
+/* no-code visual helpers */
+.click-go-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+}
+.click-go-step {
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.7rem;
+  background: rgba(255,255,255,0.055);
+  min-height: 72px;
+}
+.click-go-step strong {
+  display: block;
+  line-height: 1.15;
+}
+.click-go-step span {
+  display: block;
+  color: var(--hmm-muted);
+  font-size: 0.8rem;
+  line-height: 1.25;
+  margin-top: 0.25rem;
+}
+
+.gene-context-strip {
+  position: relative;
+  min-height: 94px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 42px, rgba(255,255,255,0.055) 42px 43px),
+    linear-gradient(90deg, rgba(20,184,166,0.12), rgba(96,165,250,0.10));
+}
+.gene-context-strip .gene {
+  position: absolute;
+  height: 20px;
+  border-radius: 999px 7px 7px 999px;
+  background: var(--hmm-teal);
+}
+.gene-context-strip .gene-blue { background: var(--hmm-blue); }
+.gene-context-strip .gene-copper { background: var(--hmm-copper); }
+
+/* ── HMM logo plot ───────────────────────────────────────────── */
+.hmm-logo-container {
+  overflow-x: auto;
+  padding: 4px;
+}
+
+/* ── Alignment preview ───────────────────────────────────────── */
+.alignment-preview {
+  font-family: "Cascadia Mono", "Fira Code", monospace;
+  font-size: 11px;
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ── Progress bar in download section ───────────────────────── */
+.download-progress {
+  margin-top: 0.5rem;
+}
+
+/* ── Methods text blockquote ─────────────────────────────────── */
+.methods-text blockquote {
+  border-left: 4px solid #0d6efd;
+  padding-left: 1rem;
+  font-size: 0.9rem;
+  color: #495057;
+  background: #f0f4ff;
+  padding: 0.75rem 1rem;
+  border-radius: 0 6px 6px 0;
+}
+
+/* ── Step panels ─────────────────────────────────────────────── */
+.step-panel {
+  padding: 0.5rem;
+}
+
+/* ── Sticky submit buttons ───────────────────────────────────── */
+.sticky-run-bar {
+  position: sticky;
+  bottom: 0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(4px);
+  padding: 0.5rem 1rem;
+  border-top: 1px solid #dee2e6;
+  z-index: 100;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ── Mobile responsiveness ───────────────────────────────────── */
+@media (max-width: 980px) {
+  .stat-cards-row .card {
+    min-width: 80px;
+  }
+  .bslib-sidebar-layout,
+  .bslib-sidebar-layout > .main,
+  .bslib-sidebar-layout > main,
+  .bslib-sidebar-layout > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .bslib-sidebar-layout > .sidebar {
+    min-width: 100%;
+    max-width: 100%;
+  }
+  .nav-tabs {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .nav-tabs .nav-link {
+    font-size: 0.88rem;
+    padding: 0.45rem 0.6rem;
+  }
+  .btn,
+  .input-group,
+  .form-control {
+    max-width: 100%;
+  }
+  .table-responsive,
+  .shiny-html-output {
+    overflow-x: auto;
+  }
+}
+
+/* ── Tool badge pill ─────────────────────────────────────────── */
+.tool-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Report preview iframe ───────────────────────────────────── */
+.report-preview-container {
+  width: 100%;
+  height: 600px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.report-preview-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ── Synteny figure ──────────────────────────────────────────── */
+.synteny-container {
+  overflow-x: auto;
+}
+
+/* ── Keyboard focus outlines (accessibility) ──────────────────── */
+:focus-visible {
+  outline: 2px solid var(--hmm-teal);
+  outline-offset: 2px;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--hmm-teal);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(20,184,166,0.25);
+}
+a:focus-visible {
+  outline: 2px solid var(--hmm-blue);
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--hmm-blue);
+  outline-offset: 1px;
+}
+
+/* ── Reduced motion preference ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Button hover transitions ─────────────────────────────────── */
+.btn {
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: translateY(0);
+}
+
+/* ── Sidebar text contrast improvement ────────────────────────── */
+.bslib-sidebar-layout > .sidebar .text-white-50 {
+  color: rgba(255,255,255,0.72) !important;
+}
