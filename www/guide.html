@@ -284,7 +284,7 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
         </div>
         <div class="card">
           <h3>7. Output folders</h3>
-          <p>The sidebar project folder is the working analysis folder. Step 9 has a separate final export folder field that copies the ZIP wherever you want it saved.</p>
+          <p>The sidebar project folder is the working analysis folder. Step 9 has a folder picker plus manual path field for choosing where the final ZIP is saved.</p>
         </div>
       </div>
       <details open><summary>Conda startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
@@ -301,7 +301,7 @@ docker run --rm -p 8081:8081 \
   -v "$PWD/projects:/app/projects" \
   hmm-discovery</pre></details>
       <details><summary>Keep macOS awake for long runs</summary><pre>caffeinate -dimsu</pre><p>Stop it with <code>Control-C</code> after the run finishes.</p></details>
-      <details open><summary>Choosing where outputs go</summary><p>Choose/create a project folder in the sidebar for the working analysis. In Step 9, use <strong>Choose final export folder (ZIP destination)</strong> to copy the finished export ZIP to a folder such as <code>~/Documents/HMM-Discovery-Exports</code>, an external drive, or a private lab folder.</p></details>
+      <details open><summary>Choosing where outputs go</summary><p>Choose/create a project folder in the sidebar for the working analysis. In Step 9, use <strong>Choose final export folder (ZIP destination)</strong> and the built-in folder picker to browse Home, Documents, Desktop, the current project, parent folders, and subfolders. Click <strong>Use This Folder</strong> to fill the path, or create a new subfolder and use it immediately.</p></details>
       <p>Full Markdown reference: <a href="https://github.com/mbaffour/hmm-discovery/blob/main/docs/STARTUP_GUIDE.md">docs/STARTUP_GUIDE.md</a>.</p>
     </section>
 

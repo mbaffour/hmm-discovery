@@ -259,6 +259,34 @@ def panel_ui() -> ui.TagChild:
                     "or benchmark outputs into a public Git folder.",
                     class_="text-muted d-block mb-2",
                 ),
+                ui.card(
+                    ui.card_header(ui.tags.strong("Folder Picker")),
+                    ui.tags.p(
+                        "Browse folders from inside the app, then click Use This Folder to fill the ZIP destination above.",
+                        class_="text-muted small mb-2",
+                    ),
+                    ui.output_ui("export_folder_browser"),
+                    ui.tags.div(
+                        ui.input_action_button("btn_folder_home", "Home", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_documents", "Documents", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_desktop", "Desktop", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_project", "Project Folder", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_parent", "Parent", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_from_typed", "Browse Typed Path", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_open", "Open Selected", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
+                        ui.input_action_button("btn_folder_use", "Use This Folder", class_="btn btn-success btn-sm me-1 mb-1"),
+                        class_="mb-2",
+                    ),
+                    ui.layout_columns(
+                        ui.input_text("export_new_folder_name", "Create subfolder here", value="", placeholder="new_export_folder"),
+                        ui.tags.div(
+                            ui.input_action_button("btn_folder_create", "Create And Use", class_="btn btn-outline-success mt-4"),
+                            ui.output_ui("export_folder_browser_status"),
+                        ),
+                        col_widths=[8, 4],
+                    ),
+                    class_="mb-2 bg-light",
+                ),
                 ui.tags.div(
                     ui.input_action_button(
                         "btn_export_zip",
@@ -669,6 +697,141 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
 
     _zip_ready: reactive.Value[bytes | None] = reactive.value(None)
     _zip_saved_message: reactive.Value[str] = reactive.value("")
+    _folder_browser_dir: reactive.Value[Path] = reactive.value(Path.home() / "Documents" / "HMM-Discovery-Exports")
+    _folder_browser_message: reactive.Value[str] = reactive.value("")
+
+    def _nearest_existing_dir(path: Path) -> Path:
+        """Return path if it exists as a directory, otherwise its nearest existing parent."""
+        cur = path.expanduser()
+        if cur.is_file():
+            return cur.parent
+        while not cur.exists() and cur != cur.parent:
+            cur = cur.parent
+        if cur.is_dir():
+            return cur
+        return Path.home()
+
+    def _set_browser_dir(path: Path | str, message: str = "") -> None:
+        target = Path(path).expanduser()
+        if target.exists() and target.is_dir():
+            _folder_browser_dir.set(target.resolve())
+            _folder_browser_message.set(message)
+            return
+        fallback = _nearest_existing_dir(target)
+        _folder_browser_dir.set(fallback.resolve())
+        _folder_browser_message.set(message or f"That folder does not exist yet; browsing nearest existing folder: {fallback}")
+
+    def _safe_child_dirs(path: Path, limit: int = 250) -> list[Path]:
+        try:
+            dirs = [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")]
+        except Exception:
+            return []
+        return sorted(dirs, key=lambda p: p.name.lower())[:limit]
+
+    @output
+    @render.ui
+    def export_folder_browser():
+        current = _folder_browser_dir.get()
+        children = _safe_child_dirs(current)
+        choices = {str(child): f"{child.name}/" for child in children}
+        if not choices:
+            choices = {"": "No visible subfolders here"}
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.strong("Current folder: "),
+                ui.tags.code(str(current)),
+                class_="small mb-2",
+            ),
+            ui.input_select(
+                "export_folder_child",
+                "Subfolders",
+                choices=choices,
+                selected=next(iter(choices)),
+            ),
+        )
+
+    @output
+    @render.ui
+    def export_folder_browser_status():
+        msg = _folder_browser_message.get()
+        if not msg:
+            return ui.tags.span("")
+        cls = "text-success" if msg.startswith(("Using:", "Created:")) else "text-info"
+        return ui.tags.small(msg, class_=f"{cls} d-block mt-2")
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_home)
+    async def _on_folder_home():
+        _set_browser_dir(Path.home())
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_documents)
+    async def _on_folder_documents():
+        _set_browser_dir(Path.home() / "Documents")
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_desktop)
+    async def _on_folder_desktop():
+        _set_browser_dir(Path.home() / "Desktop")
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_project)
+    async def _on_folder_project():
+        pd_ = _proj_dir()
+        if pd_ is None:
+            _folder_browser_message.set("Load a project before jumping to the project folder.")
+            return
+        _set_browser_dir(pd_)
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_parent)
+    async def _on_folder_parent():
+        current = _folder_browser_dir.get()
+        _set_browser_dir(current.parent)
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_from_typed)
+    async def _on_folder_from_typed():
+        typed = (input.export_dest_dir() or "").strip()
+        if not typed:
+            _folder_browser_message.set("Enter or browse to a folder first.")
+            return
+        _set_browser_dir(Path(typed).expanduser())
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_open)
+    async def _on_folder_open():
+        selected = input.export_folder_child()
+        if not selected:
+            _folder_browser_message.set("No subfolder selected.")
+            return
+        _set_browser_dir(Path(selected))
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_use)
+    async def _on_folder_use():
+        current = _folder_browser_dir.get()
+        ui.update_text("export_dest_dir", value=str(current), session=session)
+        _folder_browser_message.set(f"Using: {current}")
+
+    @reactive.effect
+    @reactive.event(input.btn_folder_create)
+    async def _on_folder_create():
+        raw = (input.export_new_folder_name() or "").strip()
+        if not raw:
+            _folder_browser_message.set("Enter a subfolder name first.")
+            return
+        if any(part in raw for part in ("/", "\\")) or raw in {".", ".."}:
+            _folder_browser_message.set("Use a simple folder name without slashes.")
+            return
+        try:
+            new_dir = _folder_browser_dir.get() / raw
+            new_dir.mkdir(parents=True, exist_ok=True)
+            _set_browser_dir(new_dir, f"Created: {new_dir}")
+            ui.update_text("export_dest_dir", value=str(new_dir), session=session)
+            ui.update_text("export_new_folder_name", value="", session=session)
+        except Exception as exc:
+            _folder_browser_message.set(f"Could not create folder: {exc}")
 
     def _build_export_zip_bytes(pd_: Path) -> bytes:
         """Build and return the full export ZIP as bytes."""
