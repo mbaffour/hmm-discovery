@@ -71,7 +71,16 @@ def panel_ui() -> ui.TagChild:
                     ],
                     tone="success",
                 ),
-                col_widths=[6, 6],
+                learning_card(
+                    "Updating the app",
+                    [
+                        "Pull the newest GitHub version, update the environment, then restart the app server.",
+                        "Refresh the browser tab at http://127.0.0.1:8081 after the server restarts.",
+                        "Users still run analyses through buttons and forms; no analysis code edits are needed.",
+                    ],
+                    tone="warning",
+                ),
+                col_widths=[4, 4, 4],
                 class_="mb-3",
             ),
 

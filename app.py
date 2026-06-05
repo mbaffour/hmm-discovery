@@ -217,6 +217,7 @@ def make_ui():
                         ui.tags.li(ui.tags.small("Normal runs only use databases you select.", class_="text-white-50")),
                         ui.tags.li(ui.tags.small("For single genomes or weird genes, register a nucleotide FASTA and use six-frame ORFs.", class_="text-white-50")),
                         ui.tags.li(ui.tags.small("Generate a Run Summary before export or cleanup.", class_="text-white-50")),
+                        ui.tags.li(ui.tags.small("After app updates, restart the server and refresh this browser tab.", class_="text-white-50")),
                         class_="ps-3 mb-0",
                     ),
                     class_="workflow-coach",
