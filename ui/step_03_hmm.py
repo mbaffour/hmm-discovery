@@ -222,11 +222,54 @@ def register_outputs(
                     _logo_data.set(logo)
                 except Exception:
                     pass
-                # Self-search recovery
+                # Self-search recovery. hmmsearch targets must be ordinary
+                # ungapped protein FASTA, not MAFFT/trimAl alignments.
                 try:
-                    seeds_faa = proj / "data" / "seeds.faa"
-                    if not seeds_faa.exists():
-                        seeds_faa = aln_file  # fall back to alignment file
+                    seed_candidates = [proj / "data" / "seeds.faa"]
+                    try:
+                        state_input = state.get_project("input_path", "") if state is not None else ""
+                        if state_input:
+                            seed_candidates.append(_Path(state_input))
+                    except Exception:
+                        pass
+                    for folder in ("data", "seeds", "input"):
+                        folder_path = proj / folder
+                        if not folder_path.exists():
+                            continue
+                        for pattern in ("*.faa", "*.fa", "*.fasta"):
+                            seed_candidates.extend(sorted(folder_path.glob(pattern)))
+
+                    seeds_faa = next(
+                        (
+                            candidate
+                            for candidate in seed_candidates
+                            if _Path(candidate).exists()
+                        ),
+                        None,
+                    )
+                    if seeds_faa is None:
+                        seeds_faa = aln_file
+
+                    needs_ungap = False
+                    try:
+                        with open(seeds_faa) as fh:
+                            needs_ungap = any(
+                                "-" in line or "." in line
+                                for line in fh
+                                if line and not line.startswith(">")
+                            )
+                    except Exception:
+                        needs_ungap = False
+
+                    if needs_ungap:
+                        ungapped = proj / "hmm" / "self_search_ungapped_seeds.faa"
+                        with open(seeds_faa) as src, open(ungapped, "w") as dst:
+                            for line in src:
+                                if line.startswith(">"):
+                                    dst.write(line)
+                                else:
+                                    dst.write(line.replace("-", "").replace(".", ""))
+                        seeds_faa = ungapped
                     ss = hmm_builder.self_search_recovery(hmm_out, seeds_faa)
                     _self_search.set(ss)
                 except Exception:

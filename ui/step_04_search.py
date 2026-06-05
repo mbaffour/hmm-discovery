@@ -590,18 +590,89 @@ def register_outputs(
             if db.get("path") or db.get("download_url") or db.get("url")
         ]
 
+    def _status_text(info: dict) -> str:
+        return str(info.get("status", ""))
+
+    def _is_running_status(status: str) -> bool:
+        return any(
+            token in status
+            for token in (
+                "Queued",
+                "running",
+                "Searching",
+                "Scanning",
+                "Streaming",
+                "Downloading",
+                "Listing",
+                "File ",
+                "translated",
+                "Indexing",
+            )
+        )
+
+    def _is_complete_status(status: str) -> bool:
+        return "✅" in status or "Complete" in status
+
+    def _is_failed_status(status: str) -> bool:
+        return any(token in status for token in ("❌", "Failed", "failed", "No local file", "No files found"))
+
+    def _search_status_summary() -> tuple[int, int, int]:
+        statuses = _db_status.get()
+        complete = sum(1 for info in statuses.values() if _is_complete_status(_status_text(info)))
+        failed = sum(1 for info in statuses.values() if _is_failed_status(_status_text(info)))
+        running = sum(1 for info in statuses.values() if _is_running_status(_status_text(info)))
+        return complete, failed, running
+
+    def _lookup_db(db_name: str, proj_dir: str) -> "dict | None":
+        """Resolve built-in, streamed, and custom DB metadata by display name."""
+        import json as _json
+        from pathlib import Path as _Path
+
+        all_dbs = []
+        try:
+            reg = _get_registry()
+            if reg is not None:
+                if hasattr(reg, "get_all"):
+                    all_dbs.extend(reg.get_all())
+                elif hasattr(reg, "list_all"):
+                    all_dbs.extend(reg.list_all())
+        except Exception:
+            pass
+
+        try:
+            db_file = _Path(proj_dir) / "databases.json"
+            if db_file.exists():
+                saved = _json.loads(db_file.read_text())
+                if isinstance(saved, list):
+                    by_name = {db.get("name"): db for db in all_dbs if isinstance(db, dict)}
+                    for db in saved:
+                        if not isinstance(db, dict):
+                            continue
+                        name = db.get("name")
+                        if name in by_name:
+                            by_name[name].update({k: v for k, v in db.items() if v not in (None, "")})
+                        else:
+                            all_dbs.append(db)
+        except Exception:
+            pass
+
+        return next((db for db in all_dbs if db.get("name") == db_name), None)
+
     # ---- helper: run search for one database ---------------------------------
     async def _run_one_db(db_name: str, hmm_path: str, proj_dir: "Path",
                           db_dict: "dict | None" = None) -> None:
-        import json as _json2
         from pathlib import Path as _Path
 
-        # Use passed db_dict, or look up from local databases
-        db = db_dict
+        # Use passed db_dict, or look up from full registry/database metadata.
+        db = db_dict or _lookup_db(db_name, str(proj_dir))
         if db is None:
-            all_local = _resolve_local_dbs(str(proj_dir))
-            db = next((d for d in all_local if d["name"] == db_name), None)
-        if db is None:
+            cur = dict(_db_status.get())
+            cur[db_name] = {"status": "❌ Database metadata not found", "hits": 0}
+            _db_status.set(cur)
+            lines = list(_search_log_lines.get())
+            lines.append(f"\n=== {db_name} ===")
+            lines.append("  ERROR: Database metadata not found. Refresh database setup and try again.")
+            _search_log_lines.set(lines)
             return
 
         # Update status to running
@@ -649,7 +720,7 @@ def register_outputs(
             if not download_url:
                 cur = dict(_db_status.get())
                 cur[db_name] = {
-                    "status": "⚠️ No local file & no URL — register a local path in Database Setup",
+                    "status": "❌ No local file or download URL — register a local path in Database Setup",
                     "hits": None,
                 }
                 _db_status.set(cur)
@@ -1139,7 +1210,7 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                     _db_status.set(cur2)
                 except Exception as _exc:
                     cur2 = dict(_db_status.get())
-                    cur2[db_name] = {"status": f"translation failed: {_exc}", "hits": None}
+                    cur2[db_name] = {"status": f"❌ Translation failed: {_exc}", "hits": 0}
                     _db_status.set(cur2)
                     return
             db_path = str(prot_path)
@@ -1650,6 +1721,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
 
         # Run all selected databases sequentially (each updates progress live)
         try:
+            if state is not None:
+                state.mark_running("search")
             for name in selected:
                 # Yield to event loop so UI can flush the "Queued" → "Running" transition
                 await _asyncio.sleep(0.1)
@@ -1661,26 +1734,38 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
             _search_log_lines.set(lines)
 
         # Compile all tblout files → results/hits_main.tsv
+        compiled_rows = 0
         try:
-            await _compile_hits(proj_dir, hmm_path)
+            compiled_rows = await _compile_hits(proj_dir, hmm_path)
             lines = list(_search_log_lines.get())
-            lines.append(f"\n=== All searches complete — results compiled ===")
+            lines.append(f"\n=== Search output compiled: {compiled_rows} hit rows ===")
             _search_log_lines.set(lines)
         except Exception as _exc:
             lines = list(_search_log_lines.get())
             lines.append(f"\n⚠️ Warning compiling hits: {_exc}")
             _search_log_lines.set(lines)
 
+        complete, failed, running = _search_status_summary()
         try:
             if state is not None:
-                state.mark_complete("search", {
+                params = {
                     "databases": selected,
                     "evalue": input.search_evalue(),
-                })
+                    "complete_databases": complete,
+                    "failed_databases": failed,
+                    "hit_rows": compiled_rows,
+                }
+                if failed or running or complete == 0:
+                    state.mark_failed("search", f"{failed} failed, {complete} complete, {compiled_rows} hit rows")
+                else:
+                    state.mark_complete("search", params)
         except Exception:
             pass
 
-        ui.notification_show("✅ Search complete!", type="message", duration=4)
+        if failed or complete == 0:
+            ui.notification_show("❌ Search finished with failures. See Step 4 log.", type="error", duration=7)
+        else:
+            ui.notification_show("✅ Search complete!", type="message", duration=4)
 
     def _resolve_proj_hmm() -> "tuple[str,str]":
         """Return (proj_dir_str, hmm_path_str) reading from disk if reactive state unavailable."""
@@ -1719,7 +1804,7 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                 hmm_path = str(found[0]) if found else ""
         return proj_dir, hmm_path
 
-    async def _compile_hits(proj_dir: str, hmm_path: str) -> None:
+    async def _compile_hits(proj_dir: str, hmm_path: str) -> int:
         """Parse all tblout files in search_results/ → results/hits_main.tsv."""
         from pathlib import Path as _Path
 
@@ -1727,10 +1812,24 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
         results_dir.mkdir(parents=True, exist_ok=True)
         search_dir  = _Path(proj_dir) / "search_results"
         out_tsv     = results_dir / "hits_main.tsv"
+        empty_cols = [
+            "target_name",
+            "query_name",
+            "evalue",
+            "bit_score",
+            "bias_score",
+            "description",
+            "database_source",
+            "hmm_coverage_pct",
+            "confidence_tier",
+            "why_classified",
+            "genome_id",
+        ]
 
         tblouts = list(search_dir.glob("*.tblout")) if search_dir.exists() else []
         if not tblouts:
-            return
+            out_tsv.write_text("\t".join(empty_cols) + "\n")
+            return 0
 
         # Get HMM length from state, then HMM file, then fall back to 100
         hmm_len = 0
@@ -1754,7 +1853,7 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
             import pandas as _pd
             from pipeline.searcher import parse_tblout as _parse_tblout
         except Exception:
-            return
+            return 0
 
         all_frames = []
         for tbl in tblouts:
@@ -1795,7 +1894,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                 continue
 
         if not all_frames:
-            return
+            out_tsv.write_text("\t".join(empty_cols) + "\n")
+            return 0
 
         combined = _pd.concat(all_frames, ignore_index=True)
         # Ensure evalue column consistency
@@ -1819,6 +1919,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                 })
         except Exception:
             pass
+
+        return len(combined)
 
     def _resolve_local_dbs(proj_dir: str) -> "list[dict]":
         """Return list of database dicts that have a local path, reading directly from databases.json."""
@@ -1889,18 +1991,33 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
             lines.append(_tb.format_exc()[:500])
             _search_log_lines.set(lines)
 
+        compiled_rows = 0
         try:
-            await _compile_hits(proj_dir, hmm_path)
+            compiled_rows = await _compile_hits(proj_dir, hmm_path)
         except Exception:
             pass
 
+        complete, failed, running = _search_status_summary()
         try:
             if state is not None:
-                state.mark_complete("search", {"databases": names, "evalue": "1e-5"})
+                params = {
+                    "databases": names,
+                    "evalue": "1e-5",
+                    "complete_databases": complete,
+                    "failed_databases": failed,
+                    "hit_rows": compiled_rows,
+                }
+                if failed or running or complete == 0:
+                    state.mark_failed("search", f"{failed} failed, {complete} complete, {compiled_rows} hit rows")
+                else:
+                    state.mark_complete("search", params)
         except Exception:
             pass
 
-        ui.notification_show("✅ All searches complete!", type="message", duration=4)
+        if failed or complete == 0:
+            ui.notification_show("❌ Run All finished with failures. See Step 4 log.", type="error", duration=7)
+        else:
+            ui.notification_show("✅ All searches complete!", type="message", duration=4)
 
     # ---- search_activity_banner (prominent live status) -----------------------
     @output
@@ -1915,16 +2032,31 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
         running = []
         queued = []
         done = []
+        failed = []
         for name, info in statuses.items():
-            s = str(info.get("status", ""))
-            if "Streaming" in s or "Searching" in s or "Scanning" in s or "Downloading" in s:
+            s = _status_text(info)
+            if _is_running_status(s) and "Queued" not in s:
                 running.append((name, s))
             elif "Queued" in s:
                 queued.append(name)
-            elif "✅" in s or "Complete" in s:
+            elif _is_complete_status(s):
                 done.append(name)
+            elif _is_failed_status(s):
+                failed.append((name, s))
 
         if not running and not queued:
+            if failed:
+                return ui.tags.div(
+                    ui.tags.span("❌ Search finished with failures", class_="fs-6 fw-bold text-danger"),
+                    ui.tags.div(
+                        ui.tags.small(
+                            f"Failed: {', '.join(name for name, _ in failed[:5])}"
+                            f"{'…' if len(failed) > 5 else ''}",
+                            class_="text-muted",
+                        ),
+                    ),
+                    class_="alert alert-danger py-2 px-3 mb-3",
+                )
             if done:
                 return ui.tags.div(
                     ui.tags.span("✅ All searches complete", class_="fs-6 fw-bold text-success"),
@@ -1970,14 +2102,15 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
             )
 
         def _status_badge(s: str) -> ui.TagChild:
-            badges = {
-                "running":  ("bg-warning text-dark", "🔄 Running"),
-                "complete": ("bg-success",            "✅ Complete"),
-                "failed":   ("bg-danger",             "❌ Failed"),
-                "pending":  ("bg-secondary",          "⏳ Pending"),
-            }
-            cls, text = badges.get(s, ("bg-secondary", s))
-            return ui.tags.span(text, class_=f"badge {cls}")
+            if _is_failed_status(s):
+                return ui.tags.span("❌ Failed", class_="badge bg-danger")
+            if _is_complete_status(s):
+                return ui.tags.span("✅ Complete", class_="badge bg-success")
+            if _is_running_status(s):
+                return ui.tags.span("🔄 Running", class_="badge bg-warning text-dark")
+            if "Queued" in s:
+                return ui.tags.span("⏳ Queued", class_="badge bg-secondary")
+            return ui.tags.span(s or "pending", class_="badge bg-secondary")
 
         rows = []
         for db_name, info in statuses.items():
