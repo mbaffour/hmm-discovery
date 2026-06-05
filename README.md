@@ -15,6 +15,7 @@ HMM Discovery is built for researchers, graduate students, and bioinformatics co
 - [Comprehensive Startup Guide](docs/STARTUP_GUIDE.md)
 - [First Demo Run](#first-demo-run)
 - [No-Code App Runs](#no-code-app-runs)
+- [Local File And Folder Picking](#local-file-and-folder-picking)
 - [Full Research Run](#full-research-run)
 - [Exhaustive All-Database Benchmark](#exhaustive-all-database-benchmark)
 - [Database Behavior](#database-behavior)
@@ -130,6 +131,18 @@ summaries, clear cache files, or export results. Command-line examples in this
 README are optional conveniences for administrators, shared servers, and
 advanced automation.
 
+## Local File And Folder Picking
+
+Every app field that needs a local file or folder has a browser-based picker.
+Users can navigate from Home, Documents, Desktop, the current project folder, or
+parent folders; open subfolders; select files; choose the current folder; and
+create folders where that makes sense. Manual path typing remains available as
+a fallback.
+
+Covered paths include the project folder, Step 1 input FASTA/GenBank/folder,
+custom database or single-genome FASTA/GenBank path, benchmark FASTA, benchmark
+output folder, synteny local GenBank folder, and Step 9 final export folder.
+
 ## Full Research Run
 
 For a phage protein family discovery run:
@@ -154,8 +167,8 @@ output package diagram for slides and lab meetings.
 
 For no-code deployment validation, open the app and go to **Database Setup -> All-Database Research Validation**.
 
-1. Choose the input FASTA. Use **Use Current Project Input** after completing Step 1, or enter a FASTA path.
-2. Choose an output folder outside the Git repository.
+1. Choose the input FASTA. Use **Use Current Project Input** after completing Step 1, or use the FASTA picker.
+2. Choose an output folder outside the Git repository using the output folder picker.
 3. Click **Dry-Run Expansion** to verify the registered database list and remote file counts.
 4. Click **Start / Resume** to run the selected preset. The app shows the manifest, PID, per-database status, and live log.
 

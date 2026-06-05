@@ -80,7 +80,12 @@ except Exception as _e:
     print(f"WARNING: Could not import pipeline modules: {_e}", file=_sys.stderr)
 
 # UI panels
-from ui.components import stat_card, tool_badge
+from ui.components import (
+    filesystem_picker_ui,
+    register_filesystem_picker,
+    stat_card,
+    tool_badge,
+)
 from ui import (
     step_00_setup,
     step_01_input,
@@ -148,6 +153,21 @@ def make_ui():
                     "One folder per protein family. Reset clears all outputs but keeps your input file.",
                     class_="text-white-50",
                     style="font-size:0.7rem; line-height:1.3; display:block; margin-top:4px;",
+                ),
+                ui.accordion(
+                    ui.accordion_panel(
+                        "Browse project folder",
+                        filesystem_picker_ui(
+                            "proj_dir_picker",
+                            "Project Folder Picker",
+                            "Navigate your local folders, create a project folder if needed, then click Use Current Folder.",
+                            allow_create_dir=True,
+                            class_="mb-0",
+                        ),
+                    ),
+                    id="proj_dir_picker_accordion",
+                    open=False,
+                    class_="mt-2",
                 ),
                 class_="mb-2",
             ),
@@ -442,6 +462,20 @@ def server(input: Inputs, output: Outputs, session: Session):
     # So the pipeline always has a valid working directory even if the
     # user never touches the sidebar.
     _project_loaded = False
+
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="proj_dir_picker",
+        target_input_id="proj_dir",
+        mode="dir",
+        initial_dir=Path.home() / "Documents" / "HMM_Projects",
+        project_dir_getter=lambda: proj_dir_rv.get(),
+        allow_create_dir=True,
+    )
 
     @reactive.effect
     async def _auto_load_default():

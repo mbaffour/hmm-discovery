@@ -3,6 +3,7 @@ ui/components.py — Shared UI building blocks used across all step panels.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from shiny import ui
@@ -171,6 +172,288 @@ def gene_context_strip() -> ui.TagChild:
         class_="gene-context-strip",
         aria_label="Genome neighborhood context graphic",
     )
+
+
+# ---------------------------------------------------------------------------
+# Local filesystem picker
+# ---------------------------------------------------------------------------
+
+def filesystem_picker_ui(
+    picker_id: str,
+    title: str,
+    help_text: str,
+    *,
+    allow_create_dir: bool = False,
+    class_: str = "mb-2 bg-light",
+) -> ui.TagChild:
+    """Reusable in-app file/folder navigator for local Shiny deployments."""
+    create_controls = []
+    if allow_create_dir:
+        create_controls = [
+            ui.layout_columns(
+                ui.input_text(
+                    f"{picker_id}_new_folder_name",
+                    "Create subfolder here",
+                    value="",
+                    placeholder="new_folder",
+                ),
+                ui.tags.div(
+                    ui.input_action_button(
+                        f"{picker_id}_create",
+                        "Create And Use",
+                        class_="btn btn-outline-success mt-4",
+                    ),
+                    ui.output_ui(f"{picker_id}_status"),
+                ),
+                col_widths=[8, 4],
+            )
+        ]
+    else:
+        create_controls = [ui.output_ui(f"{picker_id}_status")]
+
+    return ui.card(
+        ui.card_header(ui.tags.strong(title)),
+        ui.tags.p(help_text, class_="text-muted small mb-2"),
+        ui.output_ui(f"{picker_id}_browser"),
+        ui.tags.div(
+            ui.input_action_button(f"{picker_id}_home", "Home", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_documents", "Documents", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_desktop", "Desktop", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_project", "Project Folder", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_parent", "Parent", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_from_typed", "Browse Typed Path", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_open", "Open Selected Folder", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_use_selected", "Use Selected", class_="btn btn-success btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_use_current", "Use Current Folder", class_="btn btn-outline-success btn-sm me-1 mb-1"),
+            class_="mb-2",
+        ),
+        *create_controls,
+        class_=class_,
+    )
+
+
+def register_filesystem_picker(
+    input,
+    output,
+    render,
+    reactive,
+    session,
+    *,
+    picker_id: str,
+    target_input_id: str,
+    mode: str = "both",
+    initial_dir: Path | str | None = None,
+    project_dir_getter=None,
+    allow_create_dir: bool = False,
+    file_suffixes: set[str] | None = None,
+) -> None:
+    """Attach server behavior for :func:`filesystem_picker_ui`.
+
+    ``mode`` can be ``"file"``, ``"dir"``, or ``"both"``. The browser lists
+    directories for navigation and files for selection when file selection is
+    allowed. It updates an existing ``ui.input_text`` identified by
+    ``target_input_id``.
+    """
+    mode = mode if mode in {"file", "dir", "both"} else "both"
+    suffixes = {s.lower() for s in (file_suffixes or set())}
+    start_dir = Path(initial_dir or (Path.home() / "Documents")).expanduser()
+    _current_dir: reactive.Value[Path] = reactive.value(start_dir if start_dir.exists() else Path.home())
+    _message: reactive.Value[str] = reactive.value("")
+
+    def _target_value() -> str:
+        try:
+            getter = getattr(input, target_input_id)
+            return (getter() or "").strip()
+        except Exception:
+            return ""
+
+    def _nearest_existing_dir(path: Path) -> Path:
+        cur = path.expanduser()
+        if cur.is_file():
+            return cur.parent
+        while not cur.exists() and cur != cur.parent:
+            cur = cur.parent
+        return cur if cur.is_dir() else Path.home()
+
+    def _set_dir(path: Path | str, message: str = "") -> None:
+        target = Path(path).expanduser()
+        if target.exists() and target.is_file():
+            target = target.parent
+        if target.exists() and target.is_dir():
+            _current_dir.set(target.resolve())
+            _message.set(message)
+            return
+        fallback = _nearest_existing_dir(target)
+        _current_dir.set(fallback.resolve())
+        _message.set(message or f"That path does not exist yet; browsing nearest existing folder: {fallback}")
+
+    def _visible_children(path: Path, limit: int = 300) -> dict[str, str]:
+        choices: dict[str, str] = {}
+        try:
+            dirs = sorted(
+                [p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")],
+                key=lambda p: p.name.lower(),
+            )
+            for child in dirs[:limit]:
+                choices[str(child)] = f"[folder] {child.name}/"
+
+            if mode in {"file", "both"}:
+                remaining = max(limit - len(choices), 0)
+                files = sorted(
+                    [
+                        p for p in path.iterdir()
+                        if p.is_file()
+                        and not p.name.startswith(".")
+                        and (not suffixes or p.suffix.lower() in suffixes or Path(p.stem).suffix.lower() in suffixes)
+                    ],
+                    key=lambda p: p.name.lower(),
+                )
+                for child in files[:remaining]:
+                    choices[str(child)] = f"[file] {child.name}"
+        except Exception:
+            return {"": "Cannot read this folder"}
+        return choices or {"": "No selectable files or folders here"}
+
+    def _selected_path() -> Path | None:
+        try:
+            raw = getattr(input, f"{picker_id}_child")()
+        except Exception:
+            raw = ""
+        if not raw:
+            return None
+        return Path(raw)
+
+    @output(id=f"{picker_id}_browser")
+    @render.ui
+    def _browser():
+        current = _current_dir.get()
+        choices = _visible_children(current)
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.strong("Current folder: "),
+                ui.tags.code(str(current)),
+                class_="small mb-2",
+            ),
+            ui.input_select(
+                f"{picker_id}_child",
+                "Files and folders",
+                choices=choices,
+                selected=next(iter(choices)),
+            ),
+        )
+
+    @output(id=f"{picker_id}_status")
+    @render.ui
+    def _status():
+        msg = _message.get()
+        if not msg:
+            return ui.tags.span("")
+        cls = "text-success" if msg.startswith(("Using:", "Created:")) else "text-info"
+        return ui.tags.small(msg, class_=f"{cls} d-block mt-2")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_home"))
+    async def _home():
+        _set_dir(Path.home())
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_documents"))
+    async def _documents():
+        _set_dir(Path.home() / "Documents")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_desktop"))
+    async def _desktop():
+        _set_dir(Path.home() / "Desktop")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_project"))
+    async def _project():
+        project_dir = None
+        if project_dir_getter is not None:
+            try:
+                project_dir = project_dir_getter()
+            except Exception:
+                project_dir = None
+        if project_dir:
+            _set_dir(Path(project_dir))
+        else:
+            _message.set("Load a project before jumping to the project folder.")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_parent"))
+    async def _parent():
+        _set_dir(_current_dir.get().parent)
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_from_typed"))
+    async def _from_typed():
+        raw = _target_value()
+        if not raw:
+            _message.set("Enter a path first, or start from Home/Documents/Desktop.")
+            return
+        _set_dir(Path(raw).expanduser())
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_open"))
+    async def _open_selected():
+        selected = _selected_path()
+        if selected is None:
+            _message.set("No folder selected.")
+            return
+        if selected.is_dir():
+            _set_dir(selected)
+        else:
+            _message.set("Selected item is a file. Use Selected to fill the path, or choose a folder to open.")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_use_selected"))
+    async def _use_selected():
+        selected = _selected_path()
+        if selected is None:
+            _message.set("No file or folder selected.")
+            return
+        if mode == "file" and not selected.is_file():
+            _message.set("Choose a file for this field.")
+            return
+        if mode == "dir" and not selected.is_dir():
+            _message.set("Choose a folder for this field.")
+            return
+        ui.update_text(target_input_id, value=str(selected), session=session)
+        _message.set(f"Using: {selected}")
+
+    @reactive.effect
+    @reactive.event(getattr(input, f"{picker_id}_use_current"))
+    async def _use_current():
+        if mode == "file":
+            _message.set("Choose a file and click Use Selected for this field.")
+            return
+        current = _current_dir.get()
+        ui.update_text(target_input_id, value=str(current), session=session)
+        _message.set(f"Using: {current}")
+
+    if allow_create_dir:
+        @reactive.effect
+        @reactive.event(getattr(input, f"{picker_id}_create"))
+        async def _create():
+            try:
+                raw = (getattr(input, f"{picker_id}_new_folder_name")() or "").strip()
+            except Exception:
+                raw = ""
+            if not raw:
+                _message.set("Enter a subfolder name first.")
+                return
+            if any(part in raw for part in ("/", "\\")) or raw in {".", ".."}:
+                _message.set("Use a simple folder name without slashes.")
+                return
+            try:
+                new_dir = _current_dir.get() / raw
+                new_dir.mkdir(parents=True, exist_ok=True)
+                _set_dir(new_dir, f"Created: {new_dir}")
+                ui.update_text(target_input_id, value=str(new_dir), session=session)
+                ui.update_text(f"{picker_id}_new_folder_name", value="", session=session)
+            except Exception as exc:
+                _message.set(f"Could not create folder: {exc}")
 
 
 # ---------------------------------------------------------------------------

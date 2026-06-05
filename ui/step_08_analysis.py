@@ -13,11 +13,13 @@ from pathlib import Path
 from shiny import ui
 
 from .components import (
+    filesystem_picker_ui,
     guidance_callout,
     info_tooltip,
     learning_card,
     step_guidance,
     log_panel,
+    register_filesystem_picker,
     section_header,
     stat_card,
     step_card,
@@ -159,6 +161,12 @@ def panel_ui() -> ui.TagChild:
                                     "synteny_local_gb_dir",
                                     "Local GenBank folder (optional)",
                                     placeholder="/path/to/genbank_files/",
+                                ),
+                                filesystem_picker_ui(
+                                    "synteny_gb_dir_picker",
+                                    "Local GenBank Folder Picker",
+                                    "Navigate to the folder containing GenBank files, then click Use Current Folder.",
+                                    allow_create_dir=True,
                                 ),
                             ),
                             col_widths=[5, 7],
@@ -564,6 +572,20 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
             if cand.exists():
                 return cand
         return pd_
+
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="synteny_gb_dir_picker",
+        target_input_id="synteny_local_gb_dir",
+        mode="dir",
+        initial_dir=Path.home() / "Documents",
+        project_dir_getter=_proj_dir,
+        allow_create_dir=True,
+    )
 
     async def _run_script(tab: str, cmd: list[str]):
         _log(tab, f"Running: {' '.join(cmd)}")

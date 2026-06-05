@@ -14,10 +14,12 @@ from .components import (
     click_go_strip,
     db_status_card,
     empty_state,
+    filesystem_picker_ui,
     gene_context_strip,
     guidance_callout,
     learning_card,
     log_panel,
+    register_filesystem_picker,
     section_header,
     stat_badge,
     step_card,
@@ -128,6 +130,11 @@ def panel_ui() -> ui.TagChild:
                                     "Local file path (optional)",
                                     placeholder="/path/to/genome.fna or database.faa",
                                 ),
+                                filesystem_picker_ui(
+                                    "custom_db_path_picker",
+                                    "Database File Picker",
+                                    "Navigate to a protein FASTA, nucleotide FASTA, GenBank file, or folder, then click Use Selected.",
+                                ),
                                 ui.input_text(
                                     "custom_db_url",
                                     "Download URL (optional)",
@@ -231,6 +238,11 @@ def panel_ui() -> ui.TagChild:
                                     value="example_data/demo_protein_family.fasta",
                                     placeholder="/path/to/seed_sequences.fasta",
                                 ),
+                                filesystem_picker_ui(
+                                    "benchmark_fasta_picker",
+                                    "Benchmark FASTA Picker",
+                                    "Navigate to the seed FASTA used to build the benchmark HMM, then click Use Selected.",
+                                ),
                                 ui.input_action_button(
                                     "benchmark_use_current_input",
                                     "Use Current Project Input",
@@ -243,6 +255,12 @@ def panel_ui() -> ui.TagChild:
                                     "Benchmark output folder",
                                     value=str(Path.home() / "Documents" / "HMM-Discovery-Benchmark"),
                                     placeholder="/path/to/benchmark_outputs",
+                                ),
+                                filesystem_picker_ui(
+                                    "benchmark_out_picker",
+                                    "Benchmark Output Folder Picker",
+                                    "Navigate to or create the benchmark output folder, then click Use Current Folder.",
+                                    allow_create_dir=True,
                                 ),
                             ),
                             col_widths=[7, 5],
@@ -404,6 +422,46 @@ def register_outputs(
     _install_log: reactive.Value = reactive.value([])
     _benchmark_refresh: reactive.Value = reactive.value(0)
     _benchmark_message: reactive.Value = reactive.value("")
+
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="custom_db_path_picker",
+        target_input_id="custom_db_path",
+        mode="both",
+        initial_dir=Path.home() / "Documents",
+        project_dir_getter=lambda: proj_dir_rv.get(),
+        file_suffixes={".fasta", ".fa", ".faa", ".fna", ".gz", ".gb", ".gbk"},
+    )
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="benchmark_fasta_picker",
+        target_input_id="benchmark_fasta",
+        mode="file",
+        initial_dir=Path.home() / "Documents",
+        project_dir_getter=lambda: proj_dir_rv.get(),
+        file_suffixes={".fasta", ".fa", ".faa", ".fna", ".gz"},
+    )
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="benchmark_out_picker",
+        target_input_id="benchmark_out",
+        mode="dir",
+        initial_dir=Path.home() / "Documents",
+        project_dir_getter=lambda: proj_dir_rv.get(),
+        allow_create_dir=True,
+    )
 
     # ── Auto-install live progress card ────────────────────────────────────
     @output

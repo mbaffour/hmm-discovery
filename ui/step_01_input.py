@@ -7,12 +7,16 @@ the first 10 sequences.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from shiny import ui
 
 from .components import (
+    filesystem_picker_ui,
     guidance_callout,
     step_guidance,
     log_panel,
+    register_filesystem_picker,
     section_header,
     stat_badge,
     stat_card,
@@ -38,7 +42,7 @@ def panel_ui() -> ui.TagChild:
                 ],
                 "Use protein sequences (.faa) if you already know them. For nucleotide genomes, enable ORF prediction.",
             ),
-            section_header("Input Source", "Upload a file or point to a folder for batch mode"),
+            section_header("Input Source", "Upload a file or browse to a local file/folder"),
 
             # ---- file upload -------------------------------------------------
             ui.layout_columns(
@@ -56,14 +60,19 @@ def panel_ui() -> ui.TagChild:
                     ),
                 ),
                 ui.card(
-                    ui.card_header("Batch Mode — Folder Path"),
+                    ui.card_header("Browse Local File Or Folder"),
                     ui.input_text(
                         "folder_path",
-                        "Or enter folder path (for batch mode)",
-                        placeholder="/path/to/genomes/",
+                        "Local file or folder path",
+                        placeholder="/path/to/sequences.fasta or /path/to/genomes/",
+                    ),
+                    filesystem_picker_ui(
+                        "input_path_picker",
+                        "Input File / Folder Picker",
+                        "Navigate to a FASTA, GenBank, .gz file, or a folder for batch mode. Click Use Selected for a file, or Use Current Folder for batch mode.",
                     ),
                     ui.tags.small(
-                        "All FASTA / GenBank files in the folder will be processed.",
+                        "Files are analyzed directly. Folders are batch mode: all FASTA / GenBank files inside are processed.",
                         class_="text-muted",
                     ),
                 ),
@@ -140,6 +149,20 @@ def register_outputs(
     _seq_count = reactive.value(0)
     _input_path = reactive.value("")
     _preview_rows = reactive.value([])       # list[tuple[str, int]]
+
+    register_filesystem_picker(
+        input,
+        output,
+        render,
+        reactive,
+        session,
+        picker_id="input_path_picker",
+        target_input_id="folder_path",
+        mode="both",
+        initial_dir=Path.home() / "Documents",
+        project_dir_getter=lambda: proj_dir_rv.get(),
+        file_suffixes={".fasta", ".fa", ".faa", ".fna", ".gz", ".gb", ".gbk"},
+    )
 
     # ---- analyze button event -----------------------------------------------
     @reactive.effect

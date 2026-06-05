@@ -286,6 +286,10 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
           <h3>7. Output folders</h3>
           <p>The sidebar project folder is the working analysis folder. Step 9 has a folder picker plus manual path field for choosing where the final ZIP is saved.</p>
         </div>
+        <div class="card">
+          <h3>8. File and folder picking</h3>
+          <p>Every local file/folder path field has an in-app picker, including project folders, Step 1 inputs, custom databases, benchmark paths, synteny GenBank folders, and exports.</p>
+        </div>
       </div>
       <details open><summary>Conda startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
 cd hmm-discovery
@@ -305,13 +309,14 @@ docker run --rm -p 8081:8081 \
   -v "$PWD/projects:/app/projects" \
   hmm-discovery</pre></details>
       <details><summary>Keep macOS awake for long runs</summary><pre>caffeinate -dimsu</pre><p>Stop it with <code>Control-C</code> after the run finishes.</p></details>
+      <details open><summary>Choosing files and folders without typing</summary><p>Use the picker beside each path field to browse Home, Documents, Desktop, the current project folder, parent folders, subfolders, and matching files. Click <strong>Use Selected</strong> for a file or selected folder, or <strong>Use Current Folder</strong> when the current folder itself is the destination. Folder destinations can create a new subfolder directly from the picker.</p></details>
       <details open><summary>Choosing where outputs go</summary><p>Choose/create a project folder in the sidebar for the working analysis. In Step 9, use <strong>Choose final export folder (ZIP destination)</strong> and the built-in folder picker to browse Home, Documents, Desktop, the current project, parent folders, and subfolders. Click <strong>Use This Folder</strong> to fill the path, or create a new subfolder and use it immediately.</p></details>
       <p>Full Markdown reference: <a href="https://github.com/mbaffour/hmm-discovery/blob/main/docs/STARTUP_GUIDE.md">docs/STARTUP_GUIDE.md</a>.</p>
     </section>
 
     <section id="workflow" class="tab">
       <h2>Research Workflow</h2>
-      <details open><summary>1. Input</summary><p>Load a curated protein seed FASTA for your family. The demo FASTA is synthetic and only checks that the app works.</p></details>
+      <details open><summary>1. Input</summary><p>Load a curated protein seed FASTA for your family. The demo FASTA is synthetic and only checks that the app works. Use the Step 1 file/folder picker if you do not want to type a local path.</p></details>
       <details><summary>2. Alignment and HMM</summary><p>Run MAFFT, trimAl, and HMMER. Inspect seed recovery before searching large databases.</p></details>
       <details><summary>3. Search</summary><p>Start with protein databases for a fast signal. For a single genome or bring-your-own FASTA run, register the target in <strong>Database Setup -> Add Custom Database / Single Genome Target</strong>. Nucleotide targets can be searched with Prodigal predicted genes or exhaustive six-frame ORFs.</p></details>
       <details><summary>4. Analysis</summary><p>Review confidence tiers, clusters, motifs, taxonomy, phylogeny, and synteny.</p></details>

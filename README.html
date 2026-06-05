@@ -140,6 +140,7 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
       <details><summary>3. Search</summary><p>Start with protein databases for a fast signal. For a single genome or bring-your-own FASTA run, register the target in <strong>Database Setup -> Add Custom Database / Single Genome Target</strong>. Nucleotide targets can be searched with Prodigal predicted genes or exhaustive six-frame ORFs.</p></details>
       <details><summary>4. Analysis</summary><p>Review confidence tiers, clusters, motifs, taxonomy, phylogeny, and synteny.</p></details>
       <details><summary>5. Export</summary><p>Generate a run summary, then download TSVs, figures, report HTML, methods text, reproducibility JSON, and the full ZIP. The export step can also save the ZIP directly to a folder you choose.</p></details>
+      <details><summary>6. Local file and folder picking</summary><p>Every file/folder path field has an in-app picker: project folders, Step 1 inputs, custom databases, benchmark paths, synteny GenBank folders, and export destinations. Typed paths remain available as a fallback.</p></details>
     </section>
 
     <section id="databases" class="tab">
@@ -223,6 +224,7 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
         <label><input type="checkbox"> Environment check reports <code>all_full_run_ok</code>.</label>
         <label><input type="checkbox"> Demo FASTA runs through alignment, HMM build, validation, and export.</label>
         <label><input type="checkbox"> Single-genome nucleotide run works with exhaustive six-frame ORFs and preserves hit coordinates.</label>
+        <label><input type="checkbox"> Local file/folder pickers are available for every path field.</label>
         <label><input type="checkbox"> Export ZIP can be saved to a user-selected folder.</label>
         <label><input type="checkbox"> Step 9 Run Summary creates <code>RUN_SUMMARY.md</code> and <code>run_summary.json</code>.</label>
         <label><input type="checkbox"> App benchmark panel dry-run creates a manifest and log.</label>

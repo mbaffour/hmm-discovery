@@ -879,6 +879,14 @@ docker run --rm -p 8081:8081 hmm-discovery</code>
           </ul>
         </article>
         <article class="startup-card">
+          <h3>Choosing Files And Folders</h3>
+          <ul>
+            <li>Use in-app pickers for project folders, Step 1 inputs, custom databases, benchmark paths, synteny GenBank folders, and exports.</li>
+            <li>Browse Home, Documents, Desktop, project folders, parent folders, subfolders, and matching files.</li>
+            <li>Typed paths remain available, but ordinary users should not need them.</li>
+          </ul>
+        </article>
+        <article class="startup-card">
           <h3>Updating The App</h3>
           <ul>
             <li>Pull the latest GitHub version, update the Conda environment, then restart <code>./run_app.sh</code>.</li>
@@ -896,7 +904,7 @@ docker run --rm -p 8081:8081 hmm-discovery</code>
         <p>Protein-family discovery is powerful, but the workflow usually lives across scattered command-line tools. This app packages the full path into a guided interface.</p>
       </div>
       <div class="grid article-grid">
-        <div class="card"><h3>No-code running</h3><p>Users create projects, check/install requirements, upload FASTA files, build HMMs, choose databases, scan single genomes, generate summaries, clear caches, choose export locations, and package results without writing code.</p></div>
+        <div class="card"><h3>No-code running</h3><p>Users create projects, browse to local FASTA/GenBank files or folders, check/install requirements, build HMMs, choose databases, scan single genomes, generate summaries, clear caches, choose export locations, and package results without writing code.</p></div>
         <div class="card"><h3>Unusual ORFs</h3><p>Six-frame mode scans stop-to-stop peptides in all reading frames so short, overlapping, or annotation-missed genes are not filtered out before HMMER sees them.</p></div>
         <div class="card"><h3>Reviewer context</h3><p>INPHARED, RefSeq, GPD, GVD-AVrC, VOGDB, Pfam, synteny, motifs, clustering, and phylogeny help test breadth, specificity, and biological plausibility.</p></div>
         <div class="card"><h3>Reusable outputs</h3><p>Export TSVs, GFF3, figures, methods text, run summaries, reproducibility JSON, presentation images, and a ZIP that can travel with the analysis.</p></div>

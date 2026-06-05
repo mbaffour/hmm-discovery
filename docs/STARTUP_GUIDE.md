@@ -65,7 +65,7 @@ docker run --rm -p 8081:8081 \
 Use the bundled synthetic FASTA first. It confirms that the interface, environment, HMM build, and export path work before you use real data.
 
 1. Open the app at `http://127.0.0.1:8081`.
-2. In the sidebar, choose or create a project folder outside the Git repository.
+2. In the sidebar, choose or create a project folder outside the Git repository. Use **Browse project folder** if you do not want to type a path.
 3. Go to **Step 1: Input Sequences**.
 4. Load `example_data/demo_protein_family.fasta`.
 5. Run **Step 2: Multiple Sequence Alignment**.
@@ -146,6 +146,20 @@ The default final export folder is:
 You can replace it with any folder path, for example an external drive, a lab project folder, or a private manuscript analysis folder. The folder is created if it does not exist. If you do not want to type a path, use the Step 9 folder picker to navigate and select the folder.
 
 Keep project folders, run outputs, downloaded databases, and unpublished sequences outside the Git repository.
+
+## Local File And Folder Pickers
+
+Manual path typing is optional. Every app field that needs a local file or folder also has an in-app picker:
+
+- Sidebar project folder
+- Step 1 input FASTA/GenBank file or batch folder
+- Database Setup custom database / single-genome FASTA, GenBank, or folder
+- All-database benchmark FASTA
+- All-database benchmark output folder
+- Step 8 synteny local GenBank folder
+- Step 9 final export ZIP folder
+
+The picker can start from Home, Documents, Desktop, the current project folder, or the parent folder. It can open subfolders, select files, choose the current folder, and create folders where a folder destination is expected.
 
 ## Common Startup Problems
 
