@@ -118,7 +118,12 @@ Stop it with `Control-C` when the run is finished. On laptops, keep the charger 
 
 ## Where Outputs Go
 
-Each project writes outputs into its project folder. Step 9 can create:
+There are two output locations to understand:
+
+1. **Project folder:** this is the working folder you choose/create in the app sidebar. The app writes inputs, alignments, HMMs, intermediate files, results, reports, logs, and state here.
+2. **Final export folder:** this is the folder you choose in **Step 9: Export** using **Choose final export folder (ZIP destination)**. The app copies the final export ZIP there for sharing, archiving, or uploading.
+
+Each project can contain:
 
 - run summaries
 - hit tables
@@ -129,6 +134,14 @@ Each project writes outputs into its project folder. Step 9 can create:
 - methods text
 - reproducibility JSON
 - export ZIPs
+
+The default final export folder is:
+
+```text
+~/Documents/HMM-Discovery-Exports
+```
+
+You can replace it with any folder path, for example an external drive, a lab project folder, or a private manuscript analysis folder. The folder is created if it does not exist.
 
 Keep project folders, run outputs, downloaded databases, and unpublished sequences outside the Git repository.
 

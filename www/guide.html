@@ -282,6 +282,10 @@ docker run --rm -p 8081:8081 hmm-discovery</pre>
           <h3>6. Long runs</h3>
           <p>Keep the computer awake, watch disk space, export summaries, then clear cache files when the final report and ZIP are safely saved.</p>
         </div>
+        <div class="card">
+          <h3>7. Output folders</h3>
+          <p>The sidebar project folder is the working analysis folder. Step 9 has a separate final export folder field that copies the ZIP wherever you want it saved.</p>
+        </div>
       </div>
       <details open><summary>Conda startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
 cd hmm-discovery
@@ -297,6 +301,7 @@ docker run --rm -p 8081:8081 \
   -v "$PWD/projects:/app/projects" \
   hmm-discovery</pre></details>
       <details><summary>Keep macOS awake for long runs</summary><pre>caffeinate -dimsu</pre><p>Stop it with <code>Control-C</code> after the run finishes.</p></details>
+      <details open><summary>Choosing where outputs go</summary><p>Choose/create a project folder in the sidebar for the working analysis. In Step 9, use <strong>Choose final export folder (ZIP destination)</strong> to copy the finished export ZIP to a folder such as <code>~/Documents/HMM-Discovery-Exports</code>, an external drive, or a private lab folder.</p></details>
       <p>Full Markdown reference: <a href="https://github.com/mbaffour/hmm-discovery/blob/main/docs/STARTUP_GUIDE.md">docs/STARTUP_GUIDE.md</a>.</p>
     </section>
 
@@ -306,7 +311,7 @@ docker run --rm -p 8081:8081 \
       <details><summary>2. Alignment and HMM</summary><p>Run MAFFT, trimAl, and HMMER. Inspect seed recovery before searching large databases.</p></details>
       <details><summary>3. Search</summary><p>Start with protein databases for a fast signal. For a single genome or bring-your-own FASTA run, register the target in <strong>Database Setup -> Add Custom Database / Single Genome Target</strong>. Nucleotide targets can be searched with Prodigal predicted genes or exhaustive six-frame ORFs.</p></details>
       <details><summary>4. Analysis</summary><p>Review confidence tiers, clusters, motifs, taxonomy, phylogeny, and synteny.</p></details>
-      <details><summary>5. Export</summary><p>Generate a run summary, then download TSVs, figures, report HTML, methods text, reproducibility JSON, and the full ZIP. The export step can also save the ZIP directly to a folder you choose.</p></details>
+      <details><summary>5. Export</summary><p>Generate a run summary, then download TSVs, figures, report HTML, methods text, reproducibility JSON, and the full ZIP. Step 9 can copy the final ZIP directly to a folder you choose, while the project folder remains the working analysis folder.</p></details>
     </section>
 
     <section id="databases" class="tab">

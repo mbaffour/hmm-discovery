@@ -239,7 +239,7 @@ def panel_ui() -> ui.TagChild:
                 ui.layout_columns(
                     ui.input_text(
                         "export_dest_dir",
-                        "Save export ZIP to folder",
+                        "Choose final export folder (ZIP destination)",
                         value=str(Path.home() / "Documents" / "HMM-Discovery-Exports"),
                         placeholder="/path/to/save/final/export",
                     ),
@@ -254,8 +254,9 @@ def panel_ui() -> ui.TagChild:
                     col_widths=[8, 4],
                 ),
                 ui.tags.small(
-                    "Choose a folder outside the app repository for sharable exports. "
-                    "Do not save unpublished FASTA, logs, or benchmark outputs into a public Git folder.",
+                    "This does not move the working project folder; it copies the final ZIP package to the folder you choose. "
+                    "Choose a folder outside the app repository for sharable exports. Do not save unpublished FASTA, logs, "
+                    "or benchmark outputs into a public Git folder.",
                     class_="text-muted d-block mb-2",
                 ),
                 ui.tags.div(
