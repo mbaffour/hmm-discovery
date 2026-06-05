@@ -13,7 +13,6 @@ from shiny import ui
 
 from .components import (
     step_guidance,
-    step_guidance,
     section_header,
     stat_card,
     tier_badge,
@@ -167,6 +166,7 @@ def _plotly_iframe(fig, height: str = "300px"):
 
 def register_outputs(input, output, render, reactive, session, **kwargs):
     proj_dir_rv = kwargs.get("proj_dir_rv", None)
+    state = kwargs.get("state", None)
 
     TIER_COLORS = {
         "high_confidence": "#28a745",
@@ -198,7 +198,13 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
             else:
                 return pd.DataFrame()
         try:
-            return pd.read_csv(hits_file, sep="\t")
+            df = pd.read_csv(hits_file, sep="\t")
+            if not df.empty and state is not None:
+                try:
+                    state.mark_complete("classify", {"hits_count": len(df)})
+                except Exception:
+                    pass
+            return df
         except Exception:
             return pd.DataFrame()
 

@@ -17,6 +17,10 @@ from .components import (
     stat_card,
     step_card,
     tool_badge,
+    elapsed_timer_ui,
+    cancel_button_ui,
+    make_elapsed_timer_renderer,
+    register_cancel_button,
 )
 
 
@@ -100,9 +104,11 @@ def panel_ui() -> ui.TagChild:
                     "▶ Run Alignment",
                     class_="btn btn-primary mt-2",
                 ),
+                cancel_button_ui("cancel_msa"),
                 ui.tags.span(" ", class_="me-2"),
                 ui.output_ui("msa_run_status"),
-                class_="d-flex align-items-center mt-2 mb-3",
+                elapsed_timer_ui("msa_elapsed"),
+                class_="d-flex align-items-center mt-2 mb-3 flex-wrap gap-1",
             ),
 
             # ---- results -----------------------------------------------------
@@ -206,6 +212,23 @@ def register_outputs(
         if rc == 0:
             return ui.tags.span("✅ Complete", class_="badge bg-success")
         return ui.tags.span(f"❌ Failed (exit {rc})", class_="badge bg-danger")
+
+    # ---- elapsed timer -------------------------------------------------------
+    @output
+    @render.ui
+    def msa_elapsed():
+        runner = runner_dict.get("msa")
+        if runner is None:
+            return ui.tags.span("")
+        return make_elapsed_timer_renderer(reactive, runner)()
+
+    # ---- cancel button -------------------------------------------------------
+    @reactive.effect
+    @reactive.event(input.cancel_msa)
+    def _on_cancel_msa():
+        runner = runner_dict.get("msa")
+        if runner is not None:
+            runner.cancel()
 
     # ---- run MSA event -------------------------------------------------------
     @reactive.effect

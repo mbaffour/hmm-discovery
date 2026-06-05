@@ -317,6 +317,13 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
             )
             _log(f"  → {sr['hit_count']} hits ({sr['strict_count']} strict ≥45 bits)")
             _log("Iteration complete.")
+            try:
+                state.mark_complete("iterate", {
+                    "hit_count": sr.get("hit_count", 0),
+                    "hmm_leng": info.get("leng", 0),
+                })
+            except Exception:
+                pass
 
         except Exception as exc:
             import traceback as _tb

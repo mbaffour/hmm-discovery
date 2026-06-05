@@ -223,7 +223,7 @@ button,
   font-size: 12px;
   padding: 8px 12px;
   border-radius: 6px;
-  max-height: 280px;
+  max-height: 420px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
@@ -528,4 +528,29 @@ textarea:focus-visible {
 /* ── Sidebar text contrast improvement ────────────────────────── */
 .bslib-sidebar-layout > .sidebar .text-white-50 {
   color: rgba(255,255,255,0.72) !important;
+}
+
+/* ── Log line error/warning highlighting ──────────────────────── */
+/* Applied via JS in log_panel(); targets injected <mark> spans */
+.log-error   { color: #ff6b6b; font-weight: 600; }
+.log-warn    { color: #ffd166; }
+.log-cancel  { color: #adb5bd; font-style: italic; }
+
+/* ── File browser card accent ─────────────────────────────────── */
+.card.filesystem-picker-card {
+  border-left: 3px solid var(--hmm-teal) !important;
+}
+
+/* ── Cancel button — only show while runner is idle (JS toggles) */
+.btn-cancel-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Elapsed timer badge ──────────────────────────────────────── */
+.elapsed-timer {
+  font-variant-numeric: tabular-nums;
+  min-width: 7ch;
+  text-align: center;
 }

@@ -215,23 +215,23 @@ def filesystem_picker_ui(
         create_controls = [ui.output_ui(f"{picker_id}_status")]
 
     return ui.card(
-        ui.card_header(ui.tags.strong(title)),
+        ui.card_header(ui.tags.strong("📂 " + title)),
         ui.tags.p(help_text, class_="text-muted small mb-2"),
         ui.output_ui(f"{picker_id}_browser"),
         ui.tags.div(
-            ui.input_action_button(f"{picker_id}_home", "Home", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_documents", "Documents", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_desktop", "Desktop", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_project", "Project Folder", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_parent", "Parent", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_from_typed", "Browse Typed Path", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_open", "Open Selected Folder", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_use_selected", "Use Selected", class_="btn btn-success btn-sm me-1 mb-1"),
-            ui.input_action_button(f"{picker_id}_use_current", "Use Current Folder", class_="btn btn-outline-success btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_home", "🏠 Home", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_documents", "📄 Documents", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_desktop", "🖥 Desktop", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_project", "📁 Project Folder", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_parent", "⬆ Parent", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_from_typed", "🔍 Browse Typed Path", class_="btn btn-outline-secondary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_open", "📂 Open Selected", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_use_selected", "✅ Use Selected", class_="btn btn-success btn-sm me-1 mb-1"),
+            ui.input_action_button(f"{picker_id}_use_current", "✅ Use Current Folder", class_="btn btn-outline-success btn-sm me-1 mb-1"),
             class_="mb-2",
         ),
         *create_controls,
-        class_=class_,
+        class_=f"filesystem-picker-card {class_}",
     )
 
 
@@ -586,6 +586,79 @@ def register_filesystem_picker(
             except Exception as exc:
                 _message.set(f"Could not create folder: {exc}")
 
+
+# ---------------------------------------------------------------------------
+# Elapsed timer UI + Cancel button
+# ---------------------------------------------------------------------------
+
+def make_elapsed_timer_renderer(reactive, runner):
+    """Return a render.ui-compatible callable that shows a live elapsed-time display.
+
+    Usage inside a step's register_outputs()::
+
+        @output
+        @render.ui
+        def my_elapsed():
+            return make_elapsed_timer_renderer(reactive, runner)()
+
+    Or more simply call :func:`wire_elapsed_timer` which does everything.
+    """
+    import time as _time
+
+    def _render():
+        reactive.invalidate_later(1)          # tick every second
+        is_running = runner.is_running.get()
+        rc = runner.returncode.get()
+        start = runner._start_time
+
+        if start == 0.0:
+            return ui.tags.span("")           # never started
+
+        elapsed = _time.monotonic() - start
+        mins, secs = divmod(int(elapsed), 60)
+        time_str = f"{mins}m {secs:02d}s" if mins else f"{secs}s"
+
+        if is_running:
+            return ui.tags.span(
+                f"⏱ Running for {time_str}…",
+                class_="badge bg-secondary ms-2",
+            )
+        if rc == 0:
+            return ui.tags.span(
+                f"✅ Completed in {time_str}",
+                class_="badge bg-success ms-2",
+            )
+        if rc is not None:
+            return ui.tags.span(
+                f"❌ Failed after {time_str}",
+                class_="badge bg-danger ms-2",
+            )
+        return ui.tags.span("")
+
+    return _render
+
+
+def elapsed_timer_ui(output_id: str) -> ui.TagChild:
+    """UI placeholder for :func:`register_elapsed_timer`."""
+    return ui.output_ui(output_id)
+
+
+def cancel_button_ui(button_id: str) -> ui.TagChild:
+    """Small Cancel button; shown inline next to Run buttons."""
+    return ui.input_action_button(
+        button_id,
+        "⬛ Cancel",
+        class_="btn btn-sm btn-outline-danger ms-2",
+    )
+
+
+def register_cancel_button(reactive, input, *, button_id: str, runner) -> None:
+    """Wire a cancel button to ``runner.cancel()``."""
+
+    @reactive.effect
+    @reactive.event(getattr(input, button_id))
+    def _on_cancel():
+        runner.cancel()
 
 # ---------------------------------------------------------------------------
 # Tool availability badge

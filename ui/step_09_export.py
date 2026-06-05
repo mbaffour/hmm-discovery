@@ -254,7 +254,7 @@ def panel_ui() -> ui.TagChild:
                         ),
                         ui.input_action_button(
                             "choose_export_dest_native",
-                            "Choose Folder...",
+                            "📂 Choose Save Location…",
                             class_="btn btn-primary btn-sm me-1 mb-1",
                         ),
                         ui.output_ui("choose_export_dest_native_status"),

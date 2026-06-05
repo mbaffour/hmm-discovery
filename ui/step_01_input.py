@@ -68,8 +68,8 @@ def panel_ui() -> ui.TagChild:
                         placeholder="/path/to/sequences.fasta or /path/to/genomes/",
                     ),
                     ui.tags.div(
-                        ui.input_action_button("choose_input_file_native", "Choose File...", class_="btn btn-primary btn-sm me-1 mb-1"),
-                        ui.input_action_button("choose_input_folder_native", "Choose Folder...", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
+                        ui.input_action_button("choose_input_file_native", "📂 Browse File…", class_="btn btn-primary btn-sm me-1 mb-1"),
+                        ui.input_action_button("choose_input_folder_native", "📁 Browse Folder…", class_="btn btn-outline-primary btn-sm me-1 mb-1"),
                         ui.output_ui("choose_input_file_native_status"),
                         ui.output_ui("choose_input_folder_native_status"),
                         class_="mb-2",
