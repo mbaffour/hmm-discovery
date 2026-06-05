@@ -190,7 +190,7 @@ def panel_ui() -> ui.TagChild:
                                                 "Cap on genomes shown in the synteny figure. Higher values give a "
                                                 "more complete picture but can make figures unreadable."
                                             )),
-                                            min=5, max=100, value=20, step=5),
+                                            min=5, max=500, value=20, step=5),
                             ui.input_slider("synteny_clinker_id",
                                             ui.span("clinker identity threshold", info_tooltip(
                                                 "Minimum amino-acid identity for clinker to draw a link between genes. "
@@ -650,6 +650,39 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
     _syn_tsv_path:      reactive.Value[str]   = reactive.value("")     # path to TSV on disk
     _syn_clinker_html:  reactive.Value[str]   = reactive.value("")     # clinker HTML path
 
+    def _load_existing_synteny_outputs():
+        """Load saved synteny tables/figures after app restart or page refresh."""
+        pd_ = _proj_dir()
+        if pd_ is None:
+            return None, None
+
+        tsv_path = pd_ / "results" / "synteny_table.tsv"
+        if not tsv_path.exists():
+            return None, None
+
+        try:
+            import pandas as _pd
+            from pipeline.synteny import _normalise_synteny_df, conservation_scores  # type: ignore
+
+            syn_df = _normalise_synteny_df(_pd.read_csv(tsv_path, sep="\t"))
+            cons_df = conservation_scores(syn_df)
+            _syn_df.set(syn_df)
+            _syn_cons_df.set(cons_df)
+            _syn_tsv_path.set(str(tsv_path))
+
+            fig_dir = pd_ / "figures"
+            for path, setter in [
+                (fig_dir / "synteny_map.png", _syn_png),
+                (fig_dir / "synteny_map.svg", _syn_svg),
+                (fig_dir / "synteny_map.pdf", _syn_pdf),
+            ]:
+                if path.exists():
+                    setter.set(path.read_bytes())
+            return syn_df, cons_df
+        except Exception as exc:
+            _log("synteny", f"Warning: could not load saved synteny outputs: {exc}")
+            return None, None
+
     @output
     @render.ui
     def synteny_source_note():
@@ -870,7 +903,7 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
             _log("synteny", f"❌  {exc}")
 
     # ── Viz-tool dispatcher (called from _on_run_synteny) ──────────────────────
-    async def _dispatch_viz_tool(pd_, viz_tool, gbk_dir, syn_df=None, max_genomes=20):
+    async def _dispatch_viz_tool(pd_, viz_tool, gbk_dir, syn_df=None, max_genomes=500):
         """Run the selected synteny visualization tool and store results."""
         out_dir = Path(pd_) / "results" if pd_ else Path(gbk_dir).parent
 
@@ -940,13 +973,15 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
         syn_df  = _syn_df.get()
         cons_df = _syn_cons_df.get()
         if syn_df is None or (hasattr(syn_df, 'empty') and syn_df.empty):
+            syn_df, cons_df = _load_existing_synteny_outputs()
+        if syn_df is None or (hasattr(syn_df, 'empty') and syn_df.empty):
             return ui.tags.p(
                 "Click ▶ Run Synteny Analysis to build the interactive map.",
                 class_="text-muted text-center py-4",
             )
         try:
             from pipeline.synteny import synteny_figure_plotly  # type: ignore
-            fig = synteny_figure_plotly(syn_df, cons_df, max_genomes=30)
+            fig = synteny_figure_plotly(syn_df, cons_df, max_genomes=input.synteny_max_genomes())
             return _plotly_html(fig, height="500px")
         except Exception as exc:
             return ui.tags.p(f"Plotly render error: {exc}", class_="text-danger small")
@@ -1016,6 +1051,9 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
         # Default: matplotlib / script 24 PNG stored in _syn_png
         png = _syn_png.get()
         if not png:
+            _load_existing_synteny_outputs()
+            png = _syn_png.get()
+        if not png:
             return ui.tags.p(
                 "Gene-map figure will appear here after running synteny analysis.",
                 class_="text-muted text-center py-4",
@@ -1048,6 +1086,8 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
     @render.ui
     def neighborhood_conservation():
         cons_df = _syn_cons_df.get()
+        if cons_df is None or (hasattr(cons_df, 'empty') and cons_df.empty):
+            _, cons_df = _load_existing_synteny_outputs()
         if cons_df is None or (hasattr(cons_df, 'empty') and cons_df.empty):
             # Try loading from disk (scripts mode writes intermediate TSV)
             tsv_path = _syn_tsv_path.get()
@@ -1107,6 +1147,9 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
     @render.download(filename="synteny_genemap.png")
     def dl_synteny_png_8():
         png = _syn_png.get()
+        if not png:
+            _load_existing_synteny_outputs()
+            png = _syn_png.get()
         if png:
             yield png
 
@@ -1119,6 +1162,9 @@ def register_outputs(input, output, render, reactive, session, **kwargs):
     @render.download(filename="synteny_table.tsv")
     def dl_synteny_tsv_8():
         tsv_path = _syn_tsv_path.get()
+        if not tsv_path:
+            _load_existing_synteny_outputs()
+            tsv_path = _syn_tsv_path.get()
         if tsv_path and Path(tsv_path).exists():
             yield Path(tsv_path).read_bytes()
 

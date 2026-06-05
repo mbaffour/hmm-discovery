@@ -92,10 +92,20 @@ _KEYWORD_MAP: list[tuple[str, str]] = [
     ("putative",        "unknown"),
 ]
 
-# Nucleotide accession patterns (covers RefSeq, GenBank, INPHARED, GPD, etc.)
+# Nucleotide accession patterns (covers RefSeq, GenBank, ENA/DDBJ, INPHARED, GPD, etc.)
 _NT_ACCESSION_RE = re.compile(
     r'\b('
-    r'(?:NC|NZ|NG|NT|NW|NM|NR|AC|AP|AE|CP|AY|DQ|EF|EU|FJ|GQ|HM|HQ|JF|JN|JQ|JX|KC|KF|KJ|KM|KP|KR|KT|KU|KX|KY|MF|MG|MH|MK|MN|MT|MW|MZ|OK|OL|OM|ON|OP|OQ|OR|OV|OW|OX|PP|PS)_?[0-9]{5,9}'
+    r'(?:'
+    # RefSeq
+    r'NC|NZ|NG|NT|NW|NM|NR|'
+    # GenBank
+    r'AC|AP|AE|CP|AY|DQ|EF|EU|FJ|GQ|HM|HQ|JF|JN|JQ|JX|'
+    r'KC|KF|KJ|KM|KP|KR|KT|KU|KX|KY|'
+    r'MF|MG|MH|MK|MN|MT|MW|MZ|'
+    r'OK|OL|OM|ON|OP|OQ|OR|OV|OW|OX|OY|OZ|PP|PS|'
+    # ENA/DDBJ (common in INPHARED)
+    r'AL|BK|BX|CR|CU|FN|FO|FP|FQ|FR|HE|HF|HG|LK|LM|LN|LO|LP|LR|LS|LT'
+    r')_?[0-9]{5,9}'
     r'(?:\.[0-9]+)?'
     r')\b',
     re.IGNORECASE,
@@ -118,6 +128,41 @@ def _function_color(gene_name: str, function: str) -> str:
         if keyword in combined:
             return _FUNCTION_COLORS.get(category, _FUNCTION_COLORS["unknown"])
     return _FUNCTION_COLORS["unknown"]
+
+
+def _clean_label_value(value) -> str:
+    """Return a display-safe label value, treating NaN/unknown placeholders as blank."""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    text = str(value or "").strip()
+    if text.lower() in {"", ".", "nan", "none", "null", "na", "n/a", "unknown"}:
+        return ""
+    return text
+
+
+def _short_label(value, max_len: int = 14) -> str:
+    text = _clean_label_value(value)
+    if len(text) <= max_len:
+        return text
+    if max_len <= 4:
+        return text[:max_len]
+    return text[: max_len - 1] + "…"
+
+
+def _gene_display_label(row, hit_label: str = "hit gene", max_len: int = 14) -> str:
+    """Prefer biological gene/locus names, then protein/accession IDs, then product."""
+    for key in ("gene_name", "gene", "locus_tag", "flank_gene_id", "protein_id", "target_name"):
+        value = _clean_label_value(row.get(key, "") if hasattr(row, "get") else "")
+        if value:
+            return _short_label(value, max_len=max_len)
+
+    func = _clean_label_value(row.get("function", "") if hasattr(row, "get") else "")
+    if func:
+        return _short_label(func, max_len=max_len)
+    return _short_label(hit_label, max_len=max_len)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +268,7 @@ def _parse_sixframe_orf_id(protein_id: str) -> Optional[dict]:
 
 
 _PRODIGAL_DESC_RE = re.compile(
-    r"^\s*#\s*(?P<start>\d+)\s*#\s*(?P<end>\d+)\s*#\s*(?P<strand>-?1)\s*#"
+    r"^\s*#\s*(?P<start>\d+)\s*#\s*(?P<end>\d+)\s*#\s*(?P<strand>-?1)\s*(?:#|$)"
 )
 
 
@@ -980,7 +1025,7 @@ def build_synteny_table(
     )
 
     for _, hit_row in df.iterrows():
-        protein_id = str(hit_row.get("protein_id", "") or "")
+        protein_id = str(hit_row.get("protein_id", hit_row.get("target_name", "")) or "")
         genome_id  = str(hit_row.get("genome_id",  "") or "")
         seq_from   = int(hit_row.get("seq_from", 0) or 0)
         seq_to     = int(hit_row.get("seq_to",   0) or 0)
@@ -1132,6 +1177,8 @@ def build_synteny_table(
 
     if not rows:
         syn_df = _EMPTY_SYN.copy()
+    else:
+        syn_df = _normalise_synteny_df(syn_df)
 
     return syn_df, report_df
 
@@ -1278,6 +1325,14 @@ def _normalise_synteny_df(df):
     # accession
     if 'accession' not in df.columns:
         df['accession'] = df.get('genome_id', _pd.Series(['unknown'] * len(df)))
+    # display_label: visible gene label used by static and interactive plots.
+    # Fill blank/NaN gene names with useful identifiers so figures do not show
+    # empty labels or literal "nan".
+    df['display_label'] = df.apply(lambda row: _gene_display_label(row, max_len=16), axis=1)
+    df['gene_name'] = df.apply(
+        lambda row: _clean_label_value(row.get('gene_name', '')) or row.get('display_label', 'gene'),
+        axis=1,
+    )
     return df
 
 
@@ -1307,6 +1362,7 @@ def _normalise_conservation_df(df):
             df['function'] = 'unknown'
     if 'gene_name' not in df.columns:
         df['gene_name'] = 'unknown'
+    df['gene_name'] = df['gene_name'].map(lambda v: _clean_label_value(v) or "gene")
     if 'position_rel' not in df.columns:
         df['position_rel'] = 0
     return df
@@ -1471,8 +1527,7 @@ def synteny_figure_matplotlib(
             pos    = float(g["position_rel"])
             col    = str(g.get("color", "#9E9E9E"))
             strand = str(g.get("strand", "+"))
-            name   = str(g.get("gene_name", ""))[:12]
-            func   = str(g.get("function", ""))
+            label  = _gene_display_label(g, hit_label=hit_label, max_len=14)
             is_hit = (pos == 0)
 
             dx      = 0.82 if strand == "+" else -0.82
@@ -1496,11 +1551,10 @@ def synteny_figure_matplotlib(
             )
             ax_genes.add_patch(arrow)
 
-            # Gene label above arrow
+            # Gene label above arrow — gene/locus tag, protein/accession ID, or product fallback.
             if abs(pos) <= flanks:
-                disp = hit_label if is_hit else (name or func[:12])
                 ax_genes.text(
-                    pos, row_i + arrow_h * 0.82, disp,
+                    pos, row_i + arrow_h * 0.82, label,
                     ha="center", va="bottom",
                     fontsize=4.8 if not is_hit else 5.5,
                     fontweight="bold" if is_hit else "normal",
@@ -1648,8 +1702,10 @@ def synteny_figure_plotly(
             pos    = float(g["position_rel"])
             col    = str(g.get("color", "#9E9E9E"))
             s      = str(g.get("strand", "+"))
-            name   = str(g.get("gene_name", ""))
-            func   = str(g.get("function", ""))
+            label  = _gene_display_label(g, hit_label=hit_label, max_len=18)
+            name   = _clean_label_value(g.get("gene_name", "")) or label
+            pid    = _clean_label_value(g.get("flank_gene_id", g.get("protein_id", "")))
+            func   = _clean_label_value(g.get("function", ""))
             source = str(g.get("source", ""))
             is_hit = pos == 0
 
@@ -1667,7 +1723,8 @@ def synteny_figure_plotly(
                 mode="markers",
                 marker=dict(size=20, opacity=0, color=col),
                 hovertemplate=(
-                    f"<b>{name or hit_label}</b><br>"
+                    f"<b>{label}</b><br>"
+                    f"Protein ID: {pid or 'not available'}<br>"
                     f"Function: {func}<br>"
                     f"Position: {int(pos):+d}<br>"
                     f"Strand: {s}<br>"
@@ -1676,11 +1733,20 @@ def synteny_figure_plotly(
                 ),
                 showlegend=False,
             ))
+            annotations.append(dict(
+                x=pos, y=row_i, text=label,
+                showarrow=False,
+                font=dict(
+                    size=8 if not is_hit else 9,
+                    color="#B71C1C" if is_hit else "#263238",
+                ),
+                yshift=16,
+            ))
             if is_hit:
                 annotations.append(dict(
                     x=pos, y=row_i, text="▼",
                     showarrow=False,
-                    font=dict(size=10, color="#F44336"), yshift=14,
+                    font=dict(size=10, color="#F44336"), yshift=-18,
                 ))
 
     for trace in hover_traces:
@@ -1967,7 +2033,7 @@ def run_pygenomeviz(
                 strand = 1 if str(row.get("strand", "+")) == "+" else -1
                 color  = str(row.get("color", "#9E9E9E"))
                 is_hit = int(row.get("position_rel", -99)) == 0
-                glabel = (str(row.get("gene_name", "")) or "")[:12]
+                glabel = _gene_display_label(row, max_len=14)
 
                 track.add_feature(
                     start=s,

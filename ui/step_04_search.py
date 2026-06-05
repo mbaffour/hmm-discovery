@@ -696,6 +696,80 @@ def register_outputs(
         running = sum(1 for info in statuses.values() if _is_running_status(_status_text(info)))
         return complete, failed, running
 
+    def _db_file_stem(name: str) -> str:
+        return name.replace(" ", "_").lower()
+
+    def _count_tblout_hits(path) -> int:
+        try:
+            with open(path) as fh:
+                return sum(1 for line in fh if line.strip() and not line.startswith("#"))
+        except Exception:
+            return 0
+
+    def _persisted_search_statuses() -> dict:
+        """Recover the last search status from project files after app reload."""
+        import json as _json
+        from pathlib import Path as _Path
+
+        try:
+            proj = _Path(proj_dir_rv.get()) if proj_dir_rv is not None and proj_dir_rv.get() else None
+        except Exception:
+            proj = None
+        if not proj or not proj.exists():
+            return {}
+
+        state_info = {}
+        try:
+            state_file = proj / ".pipeline_state.json"
+            if state_file.exists():
+                state_info = _json.loads(state_file.read_text()).get("steps", {}).get("search", {})
+        except Exception:
+            state_info = {}
+
+        db_names = []
+        try:
+            params = state_info.get("params", {}) if isinstance(state_info, dict) else {}
+            db_names = list(params.get("databases") or [])
+        except Exception:
+            db_names = []
+
+        search_dir = proj / "search_results"
+        tblouts = list(search_dir.glob("*.tblout")) if search_dir.exists() else []
+        if not db_names and tblouts:
+            by_stem = {}
+            try:
+                reg = _get_registry()
+                dbs = reg.get_all() if reg is not None and hasattr(reg, "get_all") else []
+                by_stem = {_db_file_stem(db.get("name", "")): db.get("name", "") for db in dbs}
+            except Exception:
+                by_stem = {}
+            db_names = [by_stem.get(tbl.stem, tbl.stem.replace("_", " ").title()) for tbl in tblouts]
+
+        if state_info.get("status") == "failed":
+            reason = state_info.get("error", "Previous search failed.")
+            return {"Previous search": {"status": f"❌ {reason}", "hits": 0}}
+
+        if state_info.get("status") != "complete" and not tblouts:
+            return {}
+
+        statuses = {}
+        for name in db_names:
+            tbl = search_dir / f"{_db_file_stem(name)}.tblout"
+            statuses[name] = {
+                "status": "✅ Complete (previous run)" if tbl.exists() else "⚠️ No tblout found for previous run",
+                "hits": _count_tblout_hits(tbl) if tbl.exists() else 0,
+            }
+
+        if not statuses and (proj / "results" / "hits_main.tsv").exists():
+            try:
+                with open(proj / "results" / "hits_main.tsv") as fh:
+                    rows = max(sum(1 for _ in fh) - 1, 0)
+            except Exception:
+                rows = 0
+            statuses["Previous search"] = {"status": "✅ Complete (previous run)", "hits": rows}
+
+        return statuses
+
     def _lookup_db(db_name: str, proj_dir: str) -> "dict | None":
         """Resolve built-in, streamed, and custom DB metadata by display name."""
         import json as _json
@@ -2103,6 +2177,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
         reactive.invalidate_later(1)
         statuses = _db_status.get()
         if not statuses:
+            statuses = _persisted_search_statuses()
+        if not statuses:
             return ui.tags.span("")
 
         # Find what's currently running
@@ -2200,25 +2276,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
         reactive.invalidate_later(2)
         statuses = _db_status.get()
         if not statuses:
-            # Check if a search was previously run (state = complete/running/failed)
-            search_was_run = (
-                state is not None
-                and state.get_status("search") in ("running", "complete", "failed")
-            )
-            if search_was_run:
-                return ui.tags.div(
-                    ui.tags.p(
-                        "⚠️ Search results not yet loaded in this session.",
-                        class_="text-warning mb-1 fw-bold",
-                    ),
-                    ui.tags.small(
-                        "The pipeline state shows a search was run. "
-                        "Refreshing the page will recover completed results from disk. "
-                        "If the search is still running in the background, results will "
-                        "appear here once it completes.",
-                        class_="text-muted",
-                    ),
-                )
+            statuses = _persisted_search_statuses()
+        if not statuses:
             return ui.tags.p(
                 "No searches started yet. Select databases above and click ▶ Run Selected.",
                 class_="text-muted",
@@ -2286,6 +2345,8 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
         from pathlib import Path as _Path
 
         statuses = _db_status.get()
+        if not statuses:
+            statuses = _persisted_search_statuses()
         if not statuses:
             return ui.tags.span("")
 
