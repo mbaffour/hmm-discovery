@@ -292,6 +292,10 @@ cd hmm-discovery
 conda env create -f environment.yml
 conda activate hmm-discovery
 ./run_app.sh</pre></details>
+      <details><summary>Updating an existing install</summary><pre>git pull
+conda env update -f environment.yml --prune
+conda activate hmm-discovery
+./run_app.sh</pre><p>After updating, restart the app process and refresh the browser tab at <code>http://127.0.0.1:8081</code>. Once the updated server is running, a normal browser refresh shows the new app.</p></details>
       <details><summary>Docker startup commands</summary><pre>git clone https://github.com/mbaffour/hmm-discovery.git
 cd hmm-discovery
 docker build -t hmm-discovery .

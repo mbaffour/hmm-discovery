@@ -34,6 +34,8 @@ conda activate hmm-discovery
 ./run_app.sh
 ```
 
+After updating, restart the app process and refresh the browser tab at `http://127.0.0.1:8081`. A normal browser refresh is enough once the updated app server is running.
+
 ## Option 2: Start With Docker
 
 ```bash
