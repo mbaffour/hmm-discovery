@@ -387,21 +387,31 @@ def build_report_context(
                 "high_confidence": cmd_rec.get("extra", {}).get("strict_count", 0),
             })
 
-    # Key figures
-    figures_dir = proj_dir / "figures"
+    # Key figures.
+    # The app writes figures to figures/; the command-line pipeline writes them
+    # to results/ (sometimes under slightly different names). Try every known
+    # location/alias so the report embeds figures regardless of which pipeline
+    # produced them. The first existing candidate wins; the stored path is
+    # relative to the reports/ directory where the HTML is written.
     key_figures = []
-    for fname, title in [
-        ("hmm_logo.png", "HMM Profile Logo"),
-        ("score_calibration.png", "Score Distribution"),
-        ("tree.png", "Phylogenetic Tree"),
-        ("heatmap.png", "Presence/Absence Heatmap"),
-        ("synteny_map.png", "Synteny Map"),
-        ("taxonomy_sankey.png", "Taxonomic Distribution"),
-    ]:
-        fpath = figures_dir / fname
+    figure_candidates: list[tuple[str, list[str]]] = [
+        ("HMM Profile Logo",        ["figures/hmm_logo.png", "results/hmm_logo.png"]),
+        ("Score Distribution",      ["figures/score_calibration.png",
+                                     "results/score_calibration.png"]),
+        ("Phylogenetic Tree",       ["figures/tree.png", "results/tree.png"]),
+        ("Presence/Absence Heatmap",["figures/heatmap.png",
+                                     "results/heatmap.png",
+                                     "results/presence_absence_heatmap.png"]),
+        ("Synteny Map",             ["figures/synteny_map.png",
+                                     "results/synteny_map.png"]),
+        ("Taxonomic Distribution",  ["figures/taxonomy_sankey.png",
+                                     "results/taxonomy_sankey.png"]),
+    ]
+    for title, candidates in figure_candidates:
+        chosen = next((rel for rel in candidates if (proj_dir / rel).exists()), None)
         key_figures.append({
             "title": title,
-            "path": f"../figures/{fname}" if fpath.exists() else None,
+            "path": f"../{chosen}" if chosen else None,
         })
 
     return {

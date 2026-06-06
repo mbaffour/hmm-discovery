@@ -1310,9 +1310,14 @@ def build_synteny_table(
     for _, hit_row in df.iterrows():
         protein_id = str(hit_row.get("protein_id", hit_row.get("target_name", "")) or "")
         genome_id  = str(hit_row.get("genome_id",  "") or "")
-        seq_from   = int(hit_row.get("seq_from", 0) or 0)
-        seq_to     = int(hit_row.get("seq_to",   0) or 0)
-        strand_val = str(hit_row.get("strand",  "+") or "+")
+        # _coerce_int is NaN-safe: `int(x or 0)` raises on NaN because NaN is
+        # truthy, so a hits table without coordinate columns would crash here.
+        seq_from   = _coerce_int(hit_row.get("seq_from", 0))
+        seq_to     = _coerce_int(hit_row.get("seq_to",   0))
+        strand_raw = hit_row.get("strand", "+")
+        strand_val = str(strand_raw) if strand_raw is not None and not (
+            isinstance(strand_raw, float) and pd.isna(strand_raw)
+        ) else "+"
 
         prodigal_hit = _parse_prodigal_hit(
             protein_id,

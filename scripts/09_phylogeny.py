@@ -27,7 +27,8 @@ WHAT THE KEY PARAMETERS MEAN
 OUTPUTS
 -------
     results/iqtree.*   IQ-TREE files (.treefile, .iqtree log, etc.)
-    results/tree.png   rendered tree figure (if toytree/toyplot are installed)
+    results/tree.png   rendered tree figure (matplotlib + Bio.Phylo)
+    results/tree.svg   vector tree figure for manuscripts
 
 INTERACTIVITY
 -------------
@@ -162,17 +163,29 @@ def main():
     # ── Render tree image (best-effort; missing libs are non-fatal) ──────
     tree_png = out_dir / "tree.png"
     guide.narrate(f"Rendering tree image → {tree_png}")
+    # Load a hits table if one exists so tip labels can be coloured by
+    # confidence tier (and the legend populated). Optional — None is fine.
+    hits_for_tree = None
+    for cand in (out_dir / "hits_main.tsv", out_dir / "hits_scored.tsv"):
+        if cand.exists():
+            try:
+                import pandas as _pd
+                hits_for_tree = _pd.read_csv(cand, sep="\t")
+                break
+            except Exception:
+                pass
     try:
         render_result = render_tree(
             treefile=treefile,
-            hits_df=None,
+            hits_df=hits_for_tree,
             out_dir=out_dir,
         )
         if render_result.get("success"):
-            guide.result(f"Tree PNG → {render_result.get('figure_path')}")
+            guide.result(f"Tree PNG → {render_result.get('png_path')}")
+            if render_result.get("svg_path"):
+                guide.detail(f"Tree SVG → {render_result.get('svg_path')}")
         else:
-            guide.warn(f"Tree rendering: {render_result.get('error', 'failed')} "
-                       "(toytree/toyplot may not be installed).")
+            guide.warn(f"Tree rendering: {render_result.get('error', 'failed')}")
     except Exception as exc:
         guide.warn(f"Tree rendering skipped: {exc}")
 

@@ -183,8 +183,15 @@ def run_iqtree(
 # ---------------------------------------------------------------------------
 
 def _render_tree_body(treefile, hits_df, out_dir, result):
-    """Inner body of render_tree — split out for exception safety."""
-    # Build protein_id → tier lookup
+    """Inner body of render_tree — split out for exception safety.
+
+    Renders the IQ-TREE Newick tree with matplotlib via Bio.Phylo. This is far
+    more robust and controllable than coordinate-fragile interactive libraries:
+    the canvas scales to the tip count, tip labels are coloured by confidence
+    tier, and a proper legend lists only the tiers actually present. Both PNG
+    (raster, for the report) and SVG (vector, for manuscripts) are written.
+    """
+    # Build protein_id → tier lookup so tip labels can be coloured by tier.
     tier_map: dict[str, str] = {}
     if hits_df is not None and not hits_df.empty:
         for _, row in hits_df.iterrows():
@@ -193,139 +200,133 @@ def _render_tree_body(treefile, hits_df, out_dir, result):
             if pid:
                 tier_map[pid] = tier
 
-    # Ensure ghostscript (needed by toyplot.png) is on PATH before import,
-    # since toyplot checks for `gs` at import time.
     try:
-        from .utils import ensure_tools_on_path
-        ensure_tools_on_path()
-    except Exception:
-        pass
-
-    try:
-        import toytree
-        import toyplot
-        import toyplot.svg
-        import toyplot.png
+        import matplotlib
+        matplotlib.use("Agg")          # headless raster backend
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        from Bio import Phylo
     except ImportError as exc:
-        msg = f"toytree/toyplot not installed ({exc}); writing placeholder files"
+        msg = f"matplotlib/Bio.Phylo not installed ({exc}); writing placeholder files"
         print(f"WARNING: {msg}", file=sys.stderr)
         result["error"] = msg
-        # Write placeholder files
         png_path = out_dir / "tree.png"
         svg_path = out_dir / "tree.svg"
         png_path.write_bytes(b"")
         svg_path.write_text(
             '<svg xmlns="http://www.w3.org/2000/svg">'
-            "<text>toytree not installed</text></svg>"
+            "<text>matplotlib/Bio.Phylo not installed</text></svg>"
         )
         result["png_path"] = png_path
         result["svg_path"] = svg_path
         return result
 
     try:
-        tt = toytree.tree(str(treefile))
+        tree = Phylo.read(str(treefile), "newick")
     except Exception as exc:
         result["error"] = f"Failed to parse treefile: {exc}"
         print(f"ERROR: {result['error']}", file=sys.stderr)
         return result
 
-    # Build tip colour list
-    tip_labels = tt.get_tip_labels()
-    tip_colors: list[str] = []
-    for label in tip_labels:
-        tier = tier_map.get(label, "unknown")
-        tip_colors.append(_TIER_COLORS.get(tier, _TIER_COLORS["unknown"]))
-
-    # Determine canvas size based on number of tips
-    n_tips = len(tip_labels)
-    canvas_height = max(300, n_tips * 14 + 60)
-    canvas_width  = 600
-
-    # toytree renamed `scalebar` → `scale_bar` in v3. Detect the right name.
-    import inspect as _inspect
+    # Ladderise for a tidy, conventional ordering.
     try:
-        _draw_params = _inspect.signature(tt.draw).parameters
-    except (ValueError, TypeError):
-        _draw_params = {}
-    _scalebar_kw = {}
-    if "scale_bar" in _draw_params:
-        _scalebar_kw = {"scale_bar": True}
-    elif "scalebar" in _draw_params:
-        _scalebar_kw = {"scalebar": True}
+        tree.ladderize()
+    except Exception:
+        pass
 
+    # Count tips and size the canvas so labels never overlap.
+    terminals = tree.get_terminals()
+    n_tips = max(1, len(terminals))
+    fig_w = 10.0
+    fig_h = max(3.5, n_tips * 0.32 + 1.2)   # ~0.32 inch per tip
+
+    def _tier_for(name: str) -> str:
+        return tier_map.get(str(name or ""), "unknown")
+
+    # Bio.Phylo colours labels via a {clade_name: color} mapping.
+    label_colors = {
+        t.name: _TIER_COLORS.get(_tier_for(t.name), _TIER_COLORS["unknown"])
+        for t in terminals if t.name
+    }
+
+    # Show tip names only (suppress internal-node support labels as text — they
+    # would clutter a small tree); colour each tip by its tier.
+    def _label(clade):
+        return clade.name if clade.is_terminal() and clade.name else ""
+
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.size": 8,
+        "svg.fonttype": "none",   # editable text in the SVG
+    })
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     try:
-        canvas, axes, mark = tt.draw(
-            width=canvas_width,
-            height=canvas_height,
-            tip_labels_colors=tip_colors,
-            tip_labels_align=True,
-            node_sizes=8,
-            node_colors="white",
-            node_style={"stroke": "#333333", "stroke-width": 1},
-            edge_style={"stroke": "#333333", "stroke-width": 1},
-            **_scalebar_kw,
+        Phylo.draw(
+            tree,
+            axes=ax,
+            do_show=False,
+            label_func=_label,
+            label_colors=label_colors,
+            show_confidence=False,
         )
     except Exception as exc:
-        # Some toytree versions have different API — try minimal draw
+        # Last-resort minimal draw (no per-tip colours).
         try:
-            canvas, axes, mark = tt.draw(
-                width=canvas_width,
-                height=canvas_height,
-            )
+            ax.clear()
+            Phylo.draw(tree, axes=ax, do_show=False, label_func=_label,
+                       show_confidence=False)
         except Exception as exc2:
-            result["error"] = f"toytree draw() failed: {exc2}"
+            plt.close(fig)
+            result["error"] = f"Bio.Phylo draw failed: {exc2}"
             print(f"ERROR: {result['error']}", file=sys.stderr)
             return result
 
-    # Add legend
-    try:
-        for i, (tier, color) in enumerate(_TIER_COLORS.items()):
-            axes.text(
-                canvas_width - 140,
-                20 + i * 16,
-                tier.replace("_", " ").title(),
-                style={"fill": color, "font-size": "10px", "font-weight": "bold"},
-            )
-    except Exception:
-        pass  # Legend is optional
+    ax.set_title(f"Maximum-likelihood tree (n={n_tips} sequences)",
+                 fontsize=10, fontweight="bold")
+    ax.set_xlabel("Substitutions per site", fontsize=8)
+    ax.set_ylabel("")
+    # Bio.Phylo prints a y tick per tip; hide the numeric ticks for a clean look.
+    ax.set_yticks([])
+    for spine in ("top", "right", "left"):
+        ax.spines[spine].set_visible(False)
 
-    # Export SVG
+    # Legend: only the tiers that actually appear among the tips.
+    present = []
+    seen = set()
+    for t in terminals:
+        tier = _tier_for(t.name)
+        if tier not in seen:
+            seen.add(tier)
+            present.append(tier)
+    order = ["high_confidence", "putative", "divergent", "likely_fp", "seed", "unknown"]
+    present.sort(key=lambda x: order.index(x) if x in order else 99)
+    handles = [
+        mpatches.Patch(color=_TIER_COLORS.get(t, _TIER_COLORS["unknown"]),
+                       label=t.replace("_", " ").title())
+        for t in present
+    ]
+    if handles:
+        ax.legend(handles=handles, loc="lower right", fontsize=7,
+                  framealpha=0.9, edgecolor="#cccccc", title="Confidence tier",
+                  title_fontsize=7)
+
+    fig.tight_layout()
+
+    png_path = out_dir / "tree.png"
     svg_path = out_dir / "tree.svg"
     try:
-        svg_buf = io.BytesIO()
-        toyplot.svg.render(canvas, svg_buf)
-        svg_path.write_bytes(svg_buf.getvalue())
+        fig.savefig(str(png_path), dpi=200, bbox_inches="tight")
+        result["png_path"] = png_path
+    except Exception as exc:
+        print(f"WARNING: PNG export failed: {exc}", file=sys.stderr)
+    try:
+        fig.savefig(str(svg_path), bbox_inches="tight")
         result["svg_path"] = svg_path
     except Exception as exc:
         print(f"WARNING: SVG export failed: {exc}", file=sys.stderr)
+    plt.close(fig)
 
-    # Export PNG (requires ghostscript — skip gracefully if unavailable)
-    png_path = out_dir / "tree.png"
-    try:
-        png_buf = io.BytesIO()
-        toyplot.png.render(canvas, png_buf)
-        png_path.write_bytes(png_buf.getvalue())
-        result["png_path"] = png_path
-    except Exception as exc:
-        msg = str(exc)
-        if "ghostscript" in msg.lower() or "gs" in msg.lower():
-            print(f"INFO: PNG tree export skipped — ghostscript not installed. SVG is available.", file=sys.stderr)
-        else:
-            print(f"WARNING: PNG export failed: {exc}", file=sys.stderr)
-        # Fall back: render SVG to PNG via cairosvg if available
-        if svg_path.exists() and svg_path.stat().st_size > 0:
-            try:
-                import cairosvg
-                cairosvg.svg2png(
-                    url=str(svg_path),
-                    write_to=str(png_path),
-                    output_width=canvas_width * 2,
-                )
-                result["png_path"] = png_path
-            except Exception:
-                pass
-
-    result["success"] = True
+    result["success"] = bool(result.get("png_path") or result.get("svg_path"))
     return result
 
 # Internal alias
