@@ -698,16 +698,24 @@ def _prepare_sequence_context_cache(
     for _, row in hits_df.iterrows():
         pid = str(row.get("protein_id", row.get("target_name", "")) or "")
         parsed = _parse_sixframe_orf_id(pid)
-        if not parsed:
+        acc = str(
+            row.get("source_contig", "")
+            or row.get("genome_id", "")
+            or (parsed["genome"] if parsed else "")
+        )
+        try:
+            has_coords = int(row.get("seq_from", 0) or 0) > 0 and int(row.get("seq_to", 0) or 0) > 0
+        except Exception:
+            has_coords = False
+        if not parsed and not (acc and has_coords):
             continue
-        acc = str(row.get("genome_id", "") or parsed["genome"])
         if not acc or acc.lower() == "nan" or acc in seen:
             continue
         source_url = str(row.get("source_url", "") or row.get("db_path", "") or "")
         if not source_url:
             continue
         seen.add(acc)
-        parsed_genome = parsed["genome"]
+        parsed_genome = parsed["genome"] if parsed else acc
         source_candidates = {
             acc,
             acc.split(".")[0],
@@ -778,9 +786,19 @@ def fetch_neighborhood_sixframe_context(
     """Build a neighbourhood from a streamed nucleotide FASTA hit."""
     protein_id = str(hit_row.get("protein_id", hit_row.get("target_name", "")) or "")
     parsed = _parse_sixframe_orf_id(protein_id)
-    if not parsed:
+    genome_id = str(
+        hit_row.get("source_contig", "")
+        or hit_row.get("genome_id", "")
+        or (parsed["genome"] if parsed else "")
+    )
+    try:
+        row_start = int(hit_row.get("seq_from", 0) or 0)
+        row_end = int(hit_row.get("seq_to", 0) or 0)
+    except Exception:
+        row_start = row_end = 0
+    row_strand = str(hit_row.get("strand", "") or "")
+    if not parsed and (not genome_id or row_start <= 0 or row_end <= 0):
         return []
-    genome_id = str(hit_row.get("genome_id", "") or parsed["genome"])
     record_path = None
     for cand in _candidate_accessions(protein_id, genome_id):
         if cand in sequence_cache:
@@ -791,19 +809,25 @@ def fetch_neighborhood_sixframe_context(
     record = _read_cached_record(record_path)
     if record is None:
         return []
-    coords = _sixframe_segment_coords(
-        record.seq,
-        parsed["strand"],
-        parsed["frame"],
-        parsed["orf_index"],
-    )
-    if not coords:
+    coords = None
+    if parsed:
+        coords = _sixframe_segment_coords(
+            record.seq,
+            parsed["strand"],
+            parsed["frame"],
+            parsed["orf_index"],
+        )
+    if coords:
+        hit_start, hit_end, hit_strand, _aa_len = coords
+    elif row_start > 0 and row_end > 0:
+        hit_start, hit_end = sorted((row_start, row_end))
+        hit_strand = row_strand if row_strand in {"+", "-"} else "+"
+    else:
         return []
-    hit_start, hit_end, hit_strand, _aa_len = coords
     prodigal_genes = _prodigal_genes_for_record(
         record,
         Path(gene_cache_dir or record_path.parent),
-        genome_id or parsed["genome"],
+        genome_id or (parsed["genome"] if parsed else ""),
     )
     prodigal_window = _window_from_gene_calls(
         prodigal_genes,
@@ -834,7 +858,7 @@ def fetch_neighborhood_sixframe_context(
         source = "streamed_fasta_sixframe"
 
     for g in window:
-        g["accession"] = genome_id or parsed["genome"]
+        g["accession"] = genome_id or (parsed["genome"] if parsed else "")
         g["source"] = source
         if g.get("protein_id") == protein_id or g.get("position_rel") == 0:
             g["strand"] = hit_strand

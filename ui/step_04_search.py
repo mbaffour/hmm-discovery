@@ -1975,6 +1975,10 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
             "confidence_tier",
             "why_classified",
             "genome_id",
+            "source_contig",
+            "seq_from",
+            "seq_to",
+            "strand",
         ]
 
         tblouts = list(search_dir.glob("*.tblout")) if search_dir.exists() else []
@@ -2014,6 +2018,33 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                 if df.empty:
                     continue
                 df["database_source"] = db_name
+                six = df["description"].astype(str).str.extract(
+                    r"coords=([^:]+):(\d+)-(\d+)\(([+-])\)"
+                )
+                prod = df["description"].astype(str).str.extract(
+                    r"^\s*#\s*(\d+)\s*#\s*(\d+)\s*#\s*(-?1)\s*#"
+                )
+                fallback_genome = (
+                    df["target_name"]
+                    .astype(str)
+                    .str.replace(r"_sixframe_orf\d+$", "", regex=True)
+                    .str.replace(r"_s-?1_f\d+_o\d+$", "", regex=True)
+                )
+                df["genome_id"] = six[0].where(six[0].notna() & (six[0] != ""), fallback_genome)
+                df["source_contig"] = six[0].fillna("")
+                df["seq_from"] = (
+                    _pd.to_numeric(six[1], errors="coerce")
+                    .fillna(_pd.to_numeric(prod[0], errors="coerce"))
+                    .fillna(0)
+                    .astype(int)
+                )
+                df["seq_to"] = (
+                    _pd.to_numeric(six[2], errors="coerce")
+                    .fillna(_pd.to_numeric(prod[1], errors="coerce"))
+                    .fillna(0)
+                    .astype(int)
+                )
+                df["strand"] = six[3].fillna(prod[2].map({"1": "+", "-1": "-"})).fillna("")
                 # Compute HMM coverage from domain coords if available, else estimate
                 if "hmm_from" in df.columns and "hmm_to" in df.columns:
                     df["hmm_coverage_pct"] = ((df["hmm_to"] - df["hmm_from"] + 1) / hmm_len * 100).round(1)
@@ -2037,9 +2068,6 @@ for r in SeqIO.parse(sys.stdin, 'fasta'):
                     lambda r: f"bit={r.get('bit_score',0)}; hmm_cov={r.get('hmm_coverage_pct',0):.1f}%",
                     axis=1,
                 )
-                # Add genome_id (same as target_name for protein DBs)
-                if "genome_id" not in df.columns:
-                    df["genome_id"] = df["target_name"]
                 all_frames.append(df)
             except Exception:
                 continue

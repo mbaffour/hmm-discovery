@@ -54,6 +54,7 @@ from pipeline.searcher import parse_tblout  # noqa: E402
 from pipeline.synteny import (  # noqa: E402
     build_neighborhood_genbanks,
     build_synteny_table,
+    conservation_scores,
     export_gff3,
     export_synteny_figures,
 )
@@ -413,6 +414,56 @@ class Benchmark:
         except Exception as exc:
             self.log(f"WARNING: Could not remove cache {path}: {exc}")
 
+    def preserve_synteny_context_records(self, cache_file: Path, tbl: Path) -> int:
+        """Save compact FASTA records for nucleotide hits before raw DB cleanup."""
+        try:
+            from Bio import SeqIO
+        except Exception:
+            return 0
+        parsed = parse_tblout(tbl)
+        if parsed.empty or "description" not in parsed.columns:
+            return 0
+        coords = parsed["description"].astype(str).str.extract(
+            r"coords=([^:]+):(\d+)-(\d+)\(([+-])\)"
+        )
+        accessions = {
+            str(value).strip()
+            for value in coords[0].dropna().tolist()
+            if str(value).strip()
+        }
+        if not accessions:
+            return 0
+
+        context_dir = self.results / "synteny_context_cache"
+        context_dir.mkdir(parents=True, exist_ok=True)
+        wanted = set(accessions)
+        wanted.update(acc.split(".")[0] for acc in accessions if acc)
+        saved = 0
+        try:
+            handle = (
+                gzip.open(cache_file, "rt")
+                if str(cache_file).endswith(".gz")
+                else cache_file.open()
+            )
+            with handle:
+                for rec in SeqIO.parse(handle, "fasta"):
+                    rec_ids = {str(rec.id), str(rec.id).split()[0], str(rec.id).split(".")[0]}
+                    matches = {acc for acc in accessions if acc in rec_ids or acc.split(".")[0] in rec_ids}
+                    if not matches:
+                        continue
+                    for acc in matches:
+                        out = context_dir / f"{safe_name(acc, 120)}.fna"
+                        if not out.exists():
+                            SeqIO.write(rec, str(out), "fasta")
+                            saved += 1
+                    if saved >= len(accessions):
+                        break
+        except Exception as exc:
+            self.log(f"WARNING: could not preserve synteny context from {cache_file.name}: {exc}")
+        if saved:
+            self.log(f"Preserved {saved} compact synteny context records from {cache_file.name}")
+        return saved
+
     def run_protein_hmmsearch(
         self, cache_file: Path, hmm: Path, tbl: Path, cpu: int
     ) -> tuple[int, float]:
@@ -573,13 +624,26 @@ class Benchmark:
         if nt_mode == "sixframe":
             total_hits = 0
             tbl.write_text("")
+            total_chunks = len(chunk_files)
             for chunk_idx, chunk in enumerate(chunk_files, start=1):
                 try:
+                    self.log(
+                        f"{tbl.stem} chunk {chunk_idx}/{total_chunks}: "
+                        f"translating {chunk.name} with six-frame ORFs"
+                    )
                     faa, _, msg = _translate_chunk(chunk)
                     if msg:
                         failures.append(f"{chunk.name}: {msg[-500:]}")
                     if not faa.exists() or faa.stat().st_size == 0:
+                        self.log(
+                            f"{tbl.stem} chunk {chunk_idx}/{total_chunks}: "
+                            "no translated ORFs passed the length cutoff"
+                        )
                         continue
+                    self.log(
+                        f"{tbl.stem} chunk {chunk_idx}/{total_chunks}: "
+                        f"searching {format_bytes(faa.stat().st_size)} translated ORFs"
+                    )
                     part_tbl = proteins_dir / f"{chunk.stem}.tblout"
                     search_cmd = (
                         f"{q(hmmsearch)} --tblout {q(part_tbl)} -E {self.args.evalue} "
@@ -595,11 +659,17 @@ class Benchmark:
                     if rc != 0:
                         tail = stderr.read_text(errors="replace")[-1600:] if stderr.exists() else ""
                         raise RuntimeError(f"nucleotide hmmsearch failed on {chunk.name}: {tail}")
+                    chunk_hits = 0
                     with tbl.open("a") as out_tbl, part_tbl.open(errors="replace") as in_tbl:
                         for line in in_tbl:
                             if line.strip() and not line.startswith("#"):
                                 out_tbl.write(line)
+                                chunk_hits += 1
                                 total_hits += 1
+                    self.log(
+                        f"{tbl.stem} chunk {chunk_idx}/{total_chunks}: "
+                        f"{chunk_hits} hits, {total_hits} cumulative"
+                    )
                     faa.unlink(missing_ok=True)
                     part_tbl.unlink(missing_ok=True)
                     chunk.unlink(missing_ok=True)
@@ -1027,6 +1097,8 @@ class Benchmark:
                 parsed = parse_tblout(tbl)
                 if not parsed.empty and "bit_score" in parsed.columns:
                     strict = int((parsed["bit_score"] >= self.args.strict_bits).sum())
+                if db_is_nt and hits:
+                    self.preserve_synteny_context_records(cache_file, tbl)
                 total_hits += hits
                 total_strict += strict
                 runtime += elapsed
@@ -1136,19 +1208,19 @@ class Benchmark:
         if not hits.empty:
             hits["protein_id"] = hits["target_name"]
             hits["hit_id"] = hits["target_name"]
-            hits["genome_id"] = (
-                hits["target_name"]
-                .astype(str)
-                .str.replace(r"_sixframe_orf\d+$", "", regex=True)
-                .str.replace(r"_s-?1_f\d+_o\d+$", "", regex=True)
-                .str.replace(r"_\d+$", "", regex=True)
-            )
             six = hits["description"].astype(str).str.extract(
                 r"coords=([^:]+):(\d+)-(\d+)\(([+-])\)"
             )
             prod = hits["description"].astype(str).str.extract(
                 r"^\s*#\s*(\d+)\s*#\s*(\d+)\s*#\s*(-?1)\s*#"
             )
+            fallback_genome = (
+                hits["target_name"]
+                .astype(str)
+                .str.replace(r"_sixframe_orf\d+$", "", regex=True)
+                .str.replace(r"_s-?1_f\d+_o\d+$", "", regex=True)
+            )
+            hits["genome_id"] = six[0].where(six[0].notna() & (six[0] != ""), fallback_genome)
             hits["source_contig"] = six[0].fillna("")
             hits["seq_from"] = (
                 pd.to_numeric(six[1], errors="coerce")
@@ -1184,18 +1256,7 @@ class Benchmark:
             classified = hits.copy()
         classified.to_csv(self.results / "hits_classified.tsv", sep="\t", index=False)
 
-    def hmm_length(self) -> int:
-        hmm = self.hmm_dir / "benchmark_profile.hmm"
-        try:
-            with hmm.open(errors="replace") as fh:
-                for line in fh:
-                    if line.startswith("LENG"):
-                        return int(line.split()[1])
-        except Exception:
-            pass
-        return 0
-
-        matrix = build_matrix(hits, group_col="db_name") if not hits.empty else pd.DataFrame()
+        matrix = build_matrix(hits) if not hits.empty else pd.DataFrame()
         matrix.to_csv(self.results / "presence_absence_matrix.tsv", sep="\t")
         if not matrix.empty:
             try:
@@ -1242,17 +1303,33 @@ class Benchmark:
         )
         if not syn_df.empty:
             export_gff3(syn_df, self.results / "synteny_neighborhoods.gff3")
-            for fmt in ["png", "svg", "pdf"]:
-                try:
-                    export_synteny_figures(
-                        syn_df, self.figures / "synteny_map", fmt=fmt, log_callback=self.log
-                    )
-                except Exception as exc:
-                    self.log(f"WARNING: synteny {fmt} export failed: {exc}")
+            try:
+                export_synteny_figures(
+                    syn_df,
+                    conservation_scores(syn_df),
+                    out_dir=self.figures,
+                    flanks=5,
+                    max_genomes=self.args.max_synteny_genomes,
+                    dpi=300,
+                    log_callback=self.log,
+                )
+            except Exception as exc:
+                self.log(f"WARNING: synteny figure export failed: {exc}")
             try:
                 build_neighborhood_genbanks(syn_df, self.results / "synteny_genbanks")
             except Exception as exc:
                 self.log(f"WARNING: synteny GenBank export failed: {exc}")
+
+    def hmm_length(self) -> int:
+        hmm = self.hmm_dir / "benchmark_profile.hmm"
+        try:
+            with hmm.open(errors="replace") as fh:
+                for line in fh:
+                    if line.startswith("LENG"):
+                        return int(line.split()[1])
+        except Exception:
+            pass
+        return 0
 
     def write_reports(self, hits: pd.DataFrame, metrics: list[dict]) -> None:
         write_tsv(metrics, self.metrics_path)
