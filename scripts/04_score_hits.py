@@ -1,31 +1,65 @@
 #!/usr/bin/env python3
 """
-04_score_hits.py — Score and classify raw hmmsearch hits into confidence tiers.
+04_score_hits.py — Sort raw hmmsearch hits into confidence tiers.
+=================================================================
 
-Reads a TSV of hits (output of 03_search.py) and applies multi-evidence
-confidence scoring:
-  high_confidence — strong bit score + good HMM coverage
-  putative        — moderate evidence
-  divergent       — weak or partial hits
-  likely_fp       — likely false positives
+WHAT THIS STEP DOES (the biology)
+---------------------------------
+Step 03 returns every sequence that scored above an E-value cutoff — but a raw
+hit list mixes confident family members with borderline and spurious matches.
+This step weighs MULTIPLE lines of evidence (bit score, how much of the HMM the
+hit covers, alignment length, composition bias) and assigns each hit to a tier:
 
-QC flags are also appended (high_bias, short_alignment, low_complexity,
-contig_edge).
+    high_confidence — strong bit score AND good HMM coverage → almost certainly real
+    putative        — moderate evidence → probably real, worth follow-up
+    divergent       — weak or partial → possible distant homolog, treat with care
+    likely_fp       — likely false positive → background noise
 
-Example
+It also appends QC flags (high_bias, short_alignment, low_complexity,
+contig_edge) so you can see *why* a hit landed where it did.
+
+WHAT THE KEY PARAMETERS MEAN
+----------------------------
+    --evalue     Pre-filter: drop hits worse than this before scoring.
+    --bitscore   The strict bit-score boundary for the high_confidence tier.
+    --coverage   Minimum fraction of the HMM a hit must span to be "putative".
+    --hmm-length HMM length in match states; 0 = infer it from the data.
+
+OUTPUTS
 -------
+    results/hits_scored.tsv   the input hits plus confidence_tier and QC columns
+
+INTERACTIVITY
+-------------
+Run it in a terminal with no/partial arguments and it becomes a guided wizard:
+it interviews you for the inputs and thresholds, then narrates the tier
+breakdown. Pipe it, redirect it, or pass --yes for hands-off operation (safe
+for HPC / run_pipeline.py). See cli_common.py.
+
+EXAMPLES
+--------
+    # Guided — the script will interview you:
+    python3 scripts/04_score_hits.py
+
+    # Explicit:
     python3 scripts/04_score_hits.py --hits results/hits_combined.tsv --out-dir results/
-    python3 scripts/04_score_hits.py --hits hits.tsv --bitscore 50 --coverage 0.7
+
+    # Custom thresholds, hands-off:
+    python3 scripts/04_score_hits.py --hits hits.tsv --bitscore 50 --coverage 0.7 --yes
 """
 import argparse
 import sys
 from pathlib import Path
 
+# Make the app package importable no matter what directory we are run from,
+# and make cli_common (which lives beside this script) importable too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pandas as pd
 from pipeline.confidence import classify_hits, add_qc_flags
 from pipeline.utils import ensure_tools_on_path
+from cli_common import Guide, add_common_args
 
 
 def parse_args():
@@ -33,7 +67,8 @@ def parse_args():
         description="Score hmmsearch hits into confidence tiers with QC flags.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--hits",     required=True,  type=Path,
+    # Not required=True: a human in a terminal can supply these via the wizard.
+    p.add_argument("--hits",     type=Path,
                    help="Input hits TSV (output of 03_search.py or similar).")
     p.add_argument("--out-dir",  default=Path("results"), type=Path,
                    help="Output directory.")
@@ -45,74 +80,123 @@ def parse_args():
                    help="Minimum HMM coverage fraction for putative tier (0–1).")
     p.add_argument("--hmm-length", default=0,    type=int,
                    help="HMM profile length in match states. 0 = infer from data.")
+    add_common_args(p)          # --yes / --interactive / --no-color / --explain-only
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+    guide = Guide.from_args(args)
     ensure_tools_on_path()
+
+    guide.header(4, "Score Hits",
+                 "Sort raw matches into high-confidence, putative, divergent, and likely-FP tiers.")
+
+    # ── GUIDED WIZARD ────────────────────────────────────────────────────
+    if guide.interactive and args.hits is None:
+        guide.wizard_intro("Let's score your search hits.")
+        args.hits = guide.ask_path(
+            "Path to your hits TSV?",
+            default="results/hits_combined.tsv",
+            help_text="The combined hits table written by 03_search.py.",
+        )
+        args.bitscore = float(guide.ask_choice(
+            "Strict bit-score cutoff for the high-confidence tier?",
+            [
+                ("45", "45 — standard (recommended)"),
+                ("30", "30 — permissive (keeps weaker hits as high-conf)"),
+                ("60", "60 — strict (only very strong hits are high-conf)"),
+            ],
+            default_index=0,
+            help_text="Hits at or above this bit score can reach high_confidence.",
+        ))
+
+    # ── Validate (works in both modes) ───────────────────────────────────
+    if args.hits is None:
+        guide.error("No --hits given. Provide one, or run in a terminal for the wizard.")
+        sys.exit(2)
 
     hits_path = args.hits.resolve()
     out_dir = args.out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not hits_path.exists():
-        print(f"ERROR: Hits TSV not found: {hits_path}", file=sys.stderr)
+        guide.error(f"Hits TSV not found: {hits_path}")
         sys.exit(1)
 
-    print(f"\n=== Step 4: Score Hits ===")
-    print(f"  Input    : {hits_path}")
-    print(f"  E-value  : {args.evalue}")
-    print(f"  Bit score: {args.bitscore}")
-    print(f"  Coverage : {args.coverage}")
+    guide.narrate(f"Input    : {hits_path.name}")
+    guide.narrate(f"E-value  : {args.evalue}")
+    guide.narrate(f"Bit score: {args.bitscore}")
+    guide.narrate(f"Coverage : {args.coverage}")
 
     df = pd.read_csv(hits_path, sep="\t")
-    print(f"  Loaded   : {len(df)} rows")
+    guide.detail(f"Loaded {len(df)} rows.")
 
     if df.empty:
-        print("WARNING: Input is empty. Writing empty output.", file=sys.stderr)
+        guide.warn("Input is empty. Writing an empty scored table.")
         out_path = out_dir / "hits_scored.tsv"
         df.to_csv(out_path, sep="\t", index=False)
-        print(f"\nDone (empty). Output: {out_path}")
+        guide.done(f"Nothing to score. Output: {out_path}")
         sys.exit(0)
 
-    # Pre-filter on e-value if the column exists
+    # Pre-filter on e-value if the column exists.
     if "evalue" in df.columns:
         before = len(df)
         df = df[pd.to_numeric(df["evalue"], errors="coerce") <= args.evalue].copy()
-        print(f"  After e-value filter: {len(df)} / {before} rows")
+        guide.detail(f"After e-value filter (≤ {args.evalue}): {len(df)} / {before} rows.")
 
-    # Determine HMM length: from argument, or from hmm_to column max, or 0
+    # Determine HMM length: from argument, or from hmm_to column max, or 0.
     hmm_length = args.hmm_length
     if hmm_length == 0 and "hmm_to" in df.columns:
         hmm_length = int(df["hmm_to"].max()) if not df["hmm_to"].isna().all() else 0
     if hmm_length == 0:
-        print("WARNING: HMM length unknown; using 0 (all hits scored as full coverage).",
-              file=sys.stderr)
+        guide.warn("HMM length unknown; scoring all hits as full coverage.")
 
     strict = args.bitscore
-    moderate = strict * 0.67  # ~30 if strict=45
+    moderate = strict * 0.67  # ~30 if strict=45 — the putative/divergent boundary.
 
-    print(f"  HMM length: {hmm_length}")
-    print(f"  Thresholds: strict={strict}, moderate={moderate:.1f}")
+    guide.narrate(f"HMM length: {hmm_length}")
+    guide.narrate(f"Thresholds: strict={strict}, moderate={moderate:.1f}")
 
-    # Classify
+    # ── EXPLAIN-AND-CONFIRM ──────────────────────────────────────────────
+    guide.command(
+        f"classify_hits(bitscore≥{strict}, moderate≥{moderate:.1f}, "
+        f"hmm_cov≥{args.coverage}) → add_qc_flags()",
+        "Apply the multi-evidence tiering rules and append QC flags to every hit.")
+    if guide.confirm("Score the hits now?") != "yes":
+        guide.warn("Scoring skipped — nothing written.")
+        sys.exit(0)
+
+    guide.narrate("Classifying hits and adding QC flags …")
     scored = classify_hits(df, hmm_length=hmm_length, strict=strict,
                            moderate=moderate, hmm_cov_floor=args.coverage)
-
-    # Add QC flags
     scored = add_qc_flags(scored)
 
     out_path = out_dir / "hits_scored.tsv"
     scored.to_csv(out_path, sep="\t", index=False)
 
-    # Summary
-    print("\n--- Tier distribution ---")
+    # ── NARRATE: interpret the tier distribution ─────────────────────────
+    guide.header(None, "Tier distribution")
     if "confidence_tier" in scored.columns:
         counts = scored["confidence_tier"].value_counts()
         for tier, n in counts.items():
-            print(f"  {tier:<20} {n:>6}")
-    print(f"\nDone. Scored hits -> {out_path}")
+            guide.narrate(f"{tier:<20} {n:>6}")
+        high = int(counts.get("high_confidence", 0))
+        fp = int(counts.get("likely_fp", 0))
+        if high > 0:
+            guide.result(f"{high} high-confidence hits → probable true family members.")
+        elif counts.get("putative", 0) or counts.get("divergent", 0):
+            guide.result("No high-confidence hits, but putative/divergent ones exist — "
+                         "likely distant homologs.", good=False)
+            guide.detail("Consider a more permissive --bitscore, or iterate (step 06).")
+        else:
+            guide.result("All hits look like false positives.", good=False)
+            guide.detail("Re-check the input DB type and the search E-value in step 03.")
+        if fp:
+            guide.detail(f"{fp} hits flagged likely_fp — these are filtered out downstream.")
+
+    guide.done(f"Scored hits written → {out_path}")
+    guide.detail("Next: 05_classify_hits.py builds the canonical table and extracts sequences.")
     sys.exit(0)
 
 

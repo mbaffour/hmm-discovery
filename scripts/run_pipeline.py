@@ -1,36 +1,55 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py — Master pipeline runner: steps 01–14 in sequence.
+run_pipeline.py — Master runner: drive steps 01–14 end-to-end.
+==============================================================
 
-Runs the full HMM Discovery analysis pipeline end-to-end:
-  01  Align seed sequences (MAFFT)
-  02  Build HMM (hmmbuild)
-  03  Search databases (hmmsearch)
-  04  Score hits (confidence tiers + QC flags)
-  05  Classify hits + extract sequences
-  06  Iterative refinement
-  07  Synteny analysis
-  08  Taxonomy annotation
-  09  Phylogenetic tree (IQ-TREE)
-  10  Presence/absence matrix + heatmap
-  11  Sequence clustering (CD-HIT / MMseqs2)
-  12  Motif discovery (MEME + FIMO)
-  13  Functional annotation (domain architecture + TM)
-  14  HTML report + methods text + export ZIP
+WHAT THIS DOES
+--------------
+This is the conductor. It runs every step script in order, wiring each step's
+outputs into the next step's inputs, so a single command takes you from raw seed
+sequences all the way to a finished HTML report:
 
-Use --skip to omit individual steps, or --start-at to resume from a step.
+    01  Align seed sequences (MAFFT)
+    02  Build HMM (hmmbuild)
+    03  Search databases (hmmsearch)
+    04  Score hits (confidence tiers + QC flags)
+    05  Classify hits + extract sequences
+    06  Iterative refinement
+    07  Synteny analysis
+    08  Taxonomy annotation
+    09  Phylogenetic tree (IQ-TREE)
+    10  Presence/absence matrix + heatmap
+    11  Sequence clustering (CD-HIT / MMseqs2)
+    12  Motif discovery (MEME + FIMO)
+    13  Functional annotation (domain architecture + TM)
+    14  HTML report + methods text + export ZIP
 
-Example
--------
+Each step is launched as its own subprocess. The master ALWAYS passes --yes to
+every child so the children never stop to prompt mid-pipeline — any interaction
+(collecting inputs, confirming the run) happens once, here, at the top level.
+
+Use --skip to omit steps and --start-at to resume a partial run.
+
+INTERACTIVITY
+-------------
+Run it in a terminal with no/partial arguments and it becomes a guided wizard:
+it collects the seeds, database(s), and project directory, shows you the full
+plan (which steps will run vs. skip), and asks for one confirmation before
+launching. Pipe it or pass --yes to run the whole thing hands-off (HPC/cron).
+
+EXAMPLES
+--------
+    # Guided — the runner will interview you, show the plan, and confirm:
+    python3 scripts/run_pipeline.py
+
+    # Explicit, hands-off:
     python3 scripts/run_pipeline.py \\
-        --seeds seeds.faa --db phages.faa \\
-        --proj-dir my_project/ --email user@uni.edu --cpu 8
+        --seeds seeds.faa --db phages.faa --proj-dir my_project/ \\
+        --email you@uni.edu --cpu 8 --yes
 
     # Resume from step 07, skipping phylogeny and clustering:
-    python3 scripts/run_pipeline.py \\
-        --seeds seeds.faa --db phages.faa \\
-        --proj-dir my_project/ \\
-        --start-at 07 --skip 09 11
+    python3 scripts/run_pipeline.py --seeds seeds.faa --db phages.faa \\
+        --proj-dir my_project/ --start-at 07 --skip 09 11 --yes
 """
 import argparse
 import subprocess
@@ -38,10 +57,12 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure pipeline/ is importable
+# Ensure pipeline/ is importable, and cli_common (beside this script) too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pipeline.utils import ensure_tools_on_path
+from cli_common import Guide, add_common_args
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 
@@ -69,12 +90,13 @@ def parse_args():
         description="Run the complete HMM Discovery pipeline (steps 01–14).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--seeds",     required=True,  type=Path,
+    # Not required=True: a human in a terminal can supply these via the wizard.
+    p.add_argument("--seeds",     type=Path,
                    help="Un-aligned seed protein FASTA.")
-    p.add_argument("--db",        required=True,  type=Path, action="append",
+    p.add_argument("--db",        type=Path, action="append",
                    dest="dbs",   metavar="FASTA",
                    help="Target database FASTA. Repeat for multiple databases.")
-    p.add_argument("--proj-dir",  required=True,  type=Path,
+    p.add_argument("--proj-dir",  type=Path,
                    help="Project root directory. All outputs go here.")
     p.add_argument("--email",     default="researcher@example.com",
                    help="NCBI Entrez e-mail (required for synteny step 07).")
@@ -96,37 +118,87 @@ def parse_args():
                    help="Directory of local GenBank files for synteny (step 07).")
     p.add_argument("--hmm-name",  default="novel_phage_gene",
                    help="Name to embed in the HMM profile (step 02).")
+    add_common_args(p)          # --yes / --interactive / --no-color / --explain-only
     return p.parse_args()
 
 
-def run_step(step_id: str, script: str, args_list: list[str], dry_run: bool = False) -> bool:
-    """Run a pipeline step via subprocess; return True on success."""
+def run_step(guide: Guide, step_id: str, script: str, args_list: list[str]) -> bool:
+    """Run a pipeline step via subprocess; return True on success.
+
+    The child is always invoked with --yes (already present in args_list) so it
+    never tries to prompt — the master owns all interaction.
+    """
     script_path = SCRIPTS_DIR / script
     cmd = [sys.executable, str(script_path)] + args_list
-    print(f"\n{'='*60}")
-    print(f"  Running step {step_id}: {script}")
-    print(f"  CMD: {' '.join(cmd)}")
-    print(f"{'='*60}")
 
-    if dry_run:
-        return True
+    guide.command(" ".join(cmd), f"Run step {step_id} ({script}) as a subprocess.")
 
     t0 = time.time()
     proc = subprocess.run(cmd)
     elapsed = time.time() - t0
 
     if proc.returncode == 0:
-        print(f"\n  [DONE] Step {step_id} completed in {elapsed:.1f}s")
+        guide.result(f"Step {step_id} completed in {elapsed:.1f}s")
         return True
     else:
-        print(f"\n  [FAIL] Step {step_id} exited with code {proc.returncode} "
-              f"(elapsed: {elapsed:.1f}s)", file=sys.stderr)
+        guide.error(f"Step {step_id} exited with code {proc.returncode} "
+                    f"(elapsed: {elapsed:.1f}s)")
         return False
 
 
 def main():
     args = parse_args()
+    guide = Guide.from_args(args)
     ensure_tools_on_path()
+
+    guide.header(None, "HMM Discovery — Full Pipeline",
+                 "Drive steps 01–14 end-to-end, wiring each step's output into the next.")
+
+    # ── TOP-LEVEL WIZARD ─────────────────────────────────────────────────
+    # Collect the few required inputs once; children inherit them via flags.
+    if guide.interactive and (args.seeds is None or not args.dbs or args.proj_dir is None):
+        guide.wizard_intro("Let's set up the full pipeline run.")
+        if args.seeds is None:
+            args.seeds = guide.ask_path(
+                "Path to your seed protein FASTA?",
+                help_text="Un-aligned seed proteins to start from (step 01 input).",
+            )
+        if not args.dbs:
+            first = guide.ask_path(
+                "Database FASTA to search?",
+                help_text="Protein (.faa) or nucleotide (.fna) sequences to scan.",
+            )
+            args.dbs = [first]
+            while guide.ask_yesno("Add another database?", default_yes=False):
+                args.dbs.append(guide.ask_path("Next database FASTA?"))
+            args.nuc = guide.ask_yesno(
+                "Are these NUCLEOTIDE databases (raw DNA / genomes)?",
+                default_yes=False,
+                help_text="Yes → step 03 translates DNA in 6 frames before searching.",
+            )
+        if args.proj_dir is None:
+            args.proj_dir = guide.ask_path(
+                "Project directory for all outputs?",
+                default="hmm_project",
+                must_exist=False,
+                help_text="Created if it does not exist; results land in <proj-dir>/results/.",
+            )
+        args.email = guide.ask(
+            "NCBI Entrez e-mail (for synteny step 07)?",
+            default=args.email,
+            help_text="Used only if step 07 fetches neighbourhoods from NCBI.",
+        )
+
+    # ── Validate (works in both modes) ───────────────────────────────────
+    if args.seeds is None:
+        guide.error("No --seeds given. Provide one, or run in a terminal for the wizard.")
+        sys.exit(2)
+    if not args.dbs:
+        guide.error("No --db given. Provide at least one database FASTA.")
+        sys.exit(2)
+    if args.proj_dir is None:
+        guide.error("No --proj-dir given. Provide one, or run in a terminal for the wizard.")
+        sys.exit(2)
 
     proj_dir = args.proj_dir.resolve()
     proj_dir.mkdir(parents=True, exist_ok=True)
@@ -135,16 +207,15 @@ def main():
 
     seeds = args.seeds.resolve()
     if not seeds.exists():
-        print(f"ERROR: Seeds FASTA not found: {seeds}", file=sys.stderr)
+        guide.error(f"Seeds FASTA not found: {seeds}")
         sys.exit(1)
 
     for db in args.dbs:
         if not db.resolve().exists():
-            print(f"ERROR: Database not found: {db}", file=sys.stderr)
+            guide.error(f"Database not found: {db}")
             sys.exit(1)
 
-    # Normalise skip/start-at to 2-char IDs
-    skip_set  = {s.lstrip("0").zfill(2) if len(s) <= 2 else s for s in args.skip}
+    # Normalise skip/start-at to 2-char IDs.
     skip_set  = {s.zfill(2) for s in args.skip}
     start_num = int(args.start_at.lstrip("0") or "1")
 
@@ -152,19 +223,40 @@ def main():
     for db in args.dbs:
         db_flags += ["--db", str(db.resolve())]
 
-    print(f"\n{'#'*60}")
-    print(f"# HMM Discovery — Full Pipeline")
-    print(f"# Seeds   : {seeds}")
-    print(f"# Databases: {len(args.dbs)}")
-    print(f"# Proj dir : {proj_dir}")
-    print(f"# Steps to skip: {sorted(skip_set) or 'none'}")
-    print(f"# Start at : {args.start_at}")
-    print(f"{'#'*60}")
+    # ── SHOW THE PLAN and confirm once ───────────────────────────────────
+    guide.narrate(f"Seeds     : {seeds}")
+    guide.narrate(f"Databases : {len(args.dbs)} ({'nucleotide' if args.nuc else 'protein'})")
+    guide.narrate(f"Project   : {proj_dir}")
+    guide.narrate(f"CPU       : {args.cpu}   E-value: {args.evalue}")
 
-    # Track per-step status
+    guide.header(None, "Plan")
+    will_run = []
+    for step_id, script, desc in STEPS:
+        step_num = int(step_id)
+        if step_num < start_num:
+            mark, note = "skip", "before --start-at"
+        elif step_id in skip_set:
+            mark, note = "skip", "--skip"
+        else:
+            mark, note = "RUN ", ""
+            will_run.append(step_id)
+        line = f"[{mark}] {step_id}  {desc}"
+        if note:
+            line += f"   ({note})"
+        guide.narrate(line)
+
+    if not will_run:
+        guide.warn("No steps selected to run (check --skip / --start-at).")
+        sys.exit(0)
+
+    if guide.confirm(f"Run the full pipeline now ({len(will_run)} steps)?") != "yes":
+        guide.warn("Pipeline run cancelled.")
+        sys.exit(0)
+
+    # Track per-step status.
     status: dict[str, str] = {sid: "pending" for sid, _, _ in STEPS}
 
-    # Paths that accumulate as steps complete
+    # Paths that accumulate as steps complete.
     aln_faa      = results_dir / "seeds_aligned.faa"
     trimmed_faa  = results_dir / "seeds_trimmed.faa"
     profile_hmm  = results_dir / "profile.hmm"
@@ -177,9 +269,11 @@ def main():
     taxonomy_tsv = results_dir / "taxonomy_table.tsv"
     matrix_tsv   = results_dir / "presence_absence_matrix.tsv"
 
-    # Decide which alignment to use for HMM build / phylogeny
-    # (prefer trimmed if --trim was requested)
+    # Prefer the trimmed alignment for HMM build / phylogeny if --trim was set.
     final_aln = trimmed_faa if args.trim else aln_faa
+
+    # Every child runs hands-off so it never prompts mid-pipeline.
+    CHILD_YES = ["--yes"]
 
     for step_id, script, desc in STEPS:
         step_num = int(step_id)
@@ -191,11 +285,9 @@ def main():
             status[step_id] = "skipped (--skip)"
             continue
 
-        print(f"\n\n{'#'*60}")
-        print(f"# STEP {step_id}: {desc}")
-        print(f"{'#'*60}")
+        guide.header(None, f"STEP {step_id}: {desc}")
 
-        # Build step-specific argument list
+        # Build step-specific argument list.
         step_args: list[str] = []
 
         if step_id == "01":
@@ -208,7 +300,7 @@ def main():
                 step_args.append("--trim")
 
         elif step_id == "02":
-            # Use trimmed alignment if it exists, else regular alignment
+            # Use trimmed alignment if it exists, else regular alignment.
             in_aln = trimmed_faa if (args.trim and trimmed_faa.exists()) else aln_faa
             if not in_aln.exists():
                 in_aln = aln_faa
@@ -275,10 +367,7 @@ def main():
             ]
 
         elif step_id == "09":
-            # Use final alignment; if it doesn't exist use seeds_aligned.faa
-            in_aln = (profile_final.parent / "seeds_expanded.faa") \
-                if seeds_exp.exists() else aln_faa
-            # Actually for phylogeny, we want an alignment not a raw FASTA
+            # Use the final alignment; fall back to seeds_aligned.faa.
             in_aln = final_aln if final_aln.exists() else aln_faa
             step_args = [
                 "--aln",       str(in_aln),
@@ -312,13 +401,11 @@ def main():
         elif step_id == "13":
             in_faa  = hits_faa if hits_faa.exists() else seeds
             in_hmm  = profile_final if profile_final.exists() else profile_hmm
-            # Domtblout from step 03
+            # Domtblout from step 03.
             domtbl  = results_dir / "search_results"
-            # Use the first available domtblout
             domtbl_files = list(domtbl.glob("*.domtblout")) if domtbl.exists() else []
             if not domtbl_files:
-                print(f"WARNING: No domtblout files found; skipping step 13.",
-                      file=sys.stderr)
+                guide.warn("No domtblout files found; skipping step 13.")
                 status[step_id] = "skipped (no domtblout)"
                 continue
             step_args = [
@@ -334,31 +421,31 @@ def main():
                 "--out-dir",  str(proj_dir / "reports"),
             ]
 
-        ok = run_step(step_id, script, step_args)
+        # Append --yes so the child never prompts.
+        ok = run_step(guide, step_id, script, step_args + CHILD_YES)
         status[step_id] = "OK" if ok else "FAILED"
 
         if not ok:
-            print(f"\nERROR: Step {step_id} failed. Aborting pipeline.", file=sys.stderr)
-            # Print summary of what completed so far then exit
-            _print_summary(status)
+            guide.error(f"Step {step_id} failed. Aborting pipeline.")
+            _print_summary(guide, status)
             sys.exit(1)
 
-    _print_summary(status)
+    _print_summary(guide, status)
+    guide.done(f"Pipeline complete. Project: {proj_dir}")
+    guide.detail(f"Open {proj_dir / 'reports' / 'report.html'} to review the run.")
     sys.exit(0)
 
 
-def _print_summary(status: dict) -> None:
+def _print_summary(guide: Guide, status: dict) -> None:
     """Print a summary table of step outcomes."""
-    print(f"\n\n{'='*60}")
-    print(f"  Pipeline Summary")
-    print(f"{'='*60}")
-    print(f"  {'Step':<6} {'Description':<38} {'Status'}")
-    print(f"  {'-'*6} {'-'*38} {'-'*20}")
+    guide.header(None, "Pipeline Summary")
     for step_id, script, desc in STEPS:
         st = status.get(step_id, "pending")
-        flag = "OK" if st == "OK" else ("SKIP" if "skip" in st.lower() else "FAIL")
-        print(f"  {step_id:<6} {desc:<38} {st}")
-    print(f"{'='*60}\n")
+        good = (st == "OK")
+        if st == "OK" or "skip" in st.lower():
+            guide.result(f"{step_id}  {desc:<38} {st}", good=good or "skip" in st.lower())
+        else:
+            guide.result(f"{step_id}  {desc:<38} {st}", good=False)
 
 
 if __name__ == "__main__":
