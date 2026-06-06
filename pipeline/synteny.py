@@ -220,6 +220,131 @@ def _gene_display_label(row, hit_label: str = "hit gene", max_len: int = 14) -> 
 
 
 # ---------------------------------------------------------------------------
+# Coordinate-layout helpers  (coordinate-aware gene-map rendering)
+# ---------------------------------------------------------------------------
+
+def _coerce_int(value, default: int = 0) -> int:
+    """Best-effort integer conversion for table values that may be NaN/strings."""
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    try:
+        return int(float(value))
+    except Exception:
+        return default
+
+
+def _strand_symbol(value) -> str:
+    text = str(value or "+").strip()
+    if text in {"-", "-1", "reverse", "minus"}:
+        return "-"
+    return "+"
+
+
+def _interval_note(row, group: pd.DataFrame) -> str:
+    """Describe overlap/nesting relationships for hover text."""
+    start = _coerce_int(row.get("start", 0))
+    end   = _coerce_int(row.get("end",   0))
+    if start <= 0 or end <= 0:
+        return ""
+    lo, hi = sorted((start, end))
+    overlaps: list[str] = []
+    nested = False
+    row_index = getattr(row, "name", None)
+    for other_index, other in group.iterrows():
+        if row_index is not None and other_index == row_index:
+            continue
+        o_start = _coerce_int(other.get("start", 0))
+        o_end   = _coerce_int(other.get("end",   0))
+        if o_start <= 0 or o_end <= 0:
+            continue
+        o_lo, o_hi = sorted((o_start, o_end))
+        if lo <= o_hi and hi >= o_lo:
+            other_label  = _gene_display_label(other, max_len=18)
+            other_strand = _strand_symbol(other.get("strand", "+"))
+            overlaps.append(f"{other_label} ({other_strand})")
+            if (lo >= o_lo and hi <= o_hi) or (o_lo >= lo and o_hi <= hi):
+                nested = True
+    if not overlaps:
+        return ""
+    prefix = "Nested/overlapping ORF" if nested else "Overlaps"
+    return f"{prefix}: {', '.join(overlaps[:3])}{'...' if len(overlaps) > 3 else ''}"
+
+
+def _coordinate_layout_for_genome(group: pd.DataFrame) -> "tuple[list[dict], bool]":
+    """
+    Return coordinate-aware gene layout records for one locus.
+
+    Coordinates are centered on the hit gene. Overlapping genes are placed on
+    separate vertical lanes so nested opposite-strand ORFs remain visible.
+
+    Returns
+    -------
+    (items, ok)
+        *items* — list of dicts with keys: row, start, end, x0, x1, x_mid,
+        lane, lane_count, lane_offset, overlap_note.
+        *ok* — False when no valid coordinates were found (fall back to
+        relative-index mode).
+    """
+    if group is None or group.empty:
+        return [], False
+
+    rows: list[dict] = []
+    for _, row in group.iterrows():
+        start = _coerce_int(row.get("start", 0))
+        end   = _coerce_int(row.get("end",   0))
+        if start <= 0 or end <= 0:
+            continue
+        lo, hi = sorted((start, end))
+        if hi <= lo:
+            continue
+        rows.append({"row": row, "start": lo, "end": hi})
+
+    if not rows:
+        return [], False
+
+    hit_rows = [r for r in rows if float(r["row"].get("position_rel", 99) or 99) == 0]
+    origin   = (
+        (hit_rows[0]["start"] + hit_rows[0]["end"]) / 2.0
+        if hit_rows else rows[0]["start"]
+    )
+
+    # Greedy lane assignment — prevent arrows from overlapping vertically
+    lanes: list[int] = []
+    for item in sorted(rows, key=lambda r: (r["start"], r["end"])):
+        lane = 0
+        while lane < len(lanes) and item["start"] <= lanes[lane]:
+            lane += 1
+        if lane == len(lanes):
+            lanes.append(item["end"])
+        else:
+            lanes[lane] = item["end"]
+        item["lane"] = lane
+
+    lane_count = max(len(lanes), 1)
+    out: list[dict] = []
+    for item in rows:
+        lane        = int(item.get("lane", 0))
+        lane_offset = (lane - (lane_count - 1) / 2.0) * 0.20
+        row         = item["row"]
+        out.append({
+            "row":          row,
+            "start":        item["start"],
+            "end":          item["end"],
+            "x0":           (item["start"] - origin) / 1000.0,
+            "x1":           (item["end"]   - origin) / 1000.0,
+            "x_mid":        ((item["start"] + item["end"]) / 2.0 - origin) / 1000.0,
+            "lane":         lane,
+            "lane_count":   lane_count,
+            "lane_offset":  lane_offset,
+            "overlap_note": _interval_note(row, group),
+        })
+    return out, True
+
+
+# ---------------------------------------------------------------------------
 # Accession extraction
 # ---------------------------------------------------------------------------
 
@@ -1602,6 +1727,19 @@ def synteny_figure_matplotlib(
     conservation_df = _normalise_conservation_df(conservation_df)
     has_cons  = conservation_df is not None and not conservation_df.empty
 
+    # ── Coordinate-aware layout (falls back to relative-index mode) ────────
+    coord_layout: dict[str, list[dict]] = {}
+    coord_bounds: list[float] = []
+    for _gid in genomes:
+        _layout, _ok = _coordinate_layout_for_genome(
+            synteny_df[synteny_df["hit_protein_id"] == _gid]
+        )
+        if _ok:
+            coord_layout[str(_gid)] = _layout
+            for _item in _layout:
+                coord_bounds.extend([float(_item["x0"]), float(_item["x1"])])
+    coordinate_mode = bool(coord_layout)
+
     # ── Sizing: scale for print (A4-landscape friendly at ~180 mm wide) ──
     fig_w      = 14.0     # inches — ~178 mm; fits single column if scaled 50%
     row_h      = 0.70     # inch per genome row (generous for readability)
@@ -1654,14 +1792,21 @@ def synteny_figure_matplotlib(
         ax_cons.spines[["top", "right"]].set_visible(False)
 
     # ── Gene arrow rows ────────────────────────────────────────────────────
-    ax_genes.set_xlim(-flanks - 0.9, flanks + 0.9)
+    if coordinate_mode and coord_bounds:
+        _xmin, _xmax = min(coord_bounds), max(coord_bounds)
+        _pad = max(0.35, (_xmax - _xmin) * 0.05)
+        ax_genes.set_xlim(_xmin - _pad, _xmax + _pad)
+        ax_genes.set_xlabel("Position relative to query hit (kb)", fontsize=8)
+    else:
+        ax_genes.set_xlim(-flanks - 0.9, flanks + 0.9)
+        ax_genes.set_xlabel("Relative gene position", fontsize=8)
     ax_genes.set_ylim(-0.6, n_genomes - 0.4)
     ax_genes.set_yticks(range(n_genomes))
     ax_genes.set_yticklabels([str(g)[:38] for g in genomes], fontsize=6.5)
-    ax_genes.set_xlabel("Relative gene position", fontsize=8)
     ax_genes.tick_params(axis="x", labelsize=7)
     ax_genes.grid(axis="x", linestyle=":", linewidth=0.35, alpha=0.55, zorder=0)
-    ax_genes.set_xticks(range(-flanks, flanks + 1))
+    if not coordinate_mode:
+        ax_genes.set_xticks(range(-flanks, flanks + 1))
     ax_genes.spines[["top", "right"]].set_visible(False)
 
     arrow_h = 0.38
@@ -1669,44 +1814,66 @@ def synteny_figure_matplotlib(
 
     for row_i, genome_id in enumerate(genomes):
         genome_genes = synteny_df[synteny_df["hit_protein_id"] == genome_id]
-        for _, g in genome_genes.iterrows():
-            pos    = float(g["position_rel"])
-            col    = str(g.get("color", "#9E9E9E"))
-            strand = str(g.get("strand", "+"))
-            label  = _gene_display_label(g, hit_label=hit_label, max_len=14)
-            is_hit = (pos == 0)
-
-            dx      = 0.82 if strand == "+" else -0.82
-            x_body  = pos - dx * 0.5   # centre of the arrow body
-            edge_c  = "#111111" if is_hit else col
-            lw      = 2.0    if is_hit else 0.5
-            alpha   = 1.0    if is_hit else 0.88
-
-            # Arrow body (FancyArrow gives a proper arrow shape)
-            arrow = mpatches.FancyArrow(
-                x        = pos - dx * 0.46,
-                y        = row_i,
-                dx       = dx * 0.82,
-                dy       = 0,
-                width    = arrow_h,
-                head_width  = arrow_h * 1.35,
-                head_length = head_len,
-                length_includes_head=True,
-                facecolor=col, edgecolor=edge_c, linewidth=lw,
-                alpha=alpha, zorder=2,
-            )
-            ax_genes.add_patch(arrow)
-
-            # Gene label above arrow — gene/locus tag, protein/accession ID, or product fallback.
-            if abs(pos) <= flanks:
+        if coordinate_mode and str(genome_id) in coord_layout:
+            for item in coord_layout[str(genome_id)]:
+                g       = item["row"]
+                col     = str(g.get("color", "#9E9E9E"))
+                strand  = _strand_symbol(g.get("strand", "+"))
+                label   = _gene_display_label(g, hit_label=hit_label, max_len=14)
+                is_hit  = float(g.get("position_rel", 99) or 99) == 0
+                x0, x1  = float(item["x0"]), float(item["x1"])
+                y       = row_i + float(item.get("lane_offset", 0.0))
+                width   = max(abs(x1 - x0), 0.03)
+                dx      = width if strand == "+" else -width
+                x_start = min(x0, x1) if strand == "+" else max(x0, x1)
+                h       = max(0.16, arrow_h * 0.62)
+                local_head = min(max(width * 0.25, 0.025), 0.18)
+                arrow = mpatches.FancyArrow(
+                    x=x_start, y=y, dx=dx, dy=0,
+                    width=h, head_width=h * 1.35, head_length=local_head,
+                    length_includes_head=True,
+                    facecolor=col,
+                    edgecolor="#111111" if is_hit else col,
+                    linewidth=2.0 if is_hit else 0.5,
+                    alpha=1.0 if is_hit else 0.88, zorder=2,
+                )
+                ax_genes.add_patch(arrow)
                 ax_genes.text(
-                    pos, row_i + arrow_h * 0.82, label,
+                    float(item["x_mid"]), y + h * 0.85, label,
                     ha="center", va="bottom",
                     fontsize=4.8 if not is_hit else 5.5,
                     fontweight="bold" if is_hit else "normal",
                     color="#B71C1C" if is_hit else "#333333",
                     clip_on=True,
                 )
+        else:
+            for _, g in genome_genes.iterrows():
+                pos    = float(g["position_rel"])
+                col    = str(g.get("color", "#9E9E9E"))
+                strand = _strand_symbol(g.get("strand", "+"))
+                label  = _gene_display_label(g, hit_label=hit_label, max_len=14)
+                is_hit = (pos == 0)
+                dx      = 0.82 if strand == "+" else -0.82
+                edge_c  = "#111111" if is_hit else col
+                lw      = 2.0    if is_hit else 0.5
+                alpha   = 1.0    if is_hit else 0.88
+                arrow = mpatches.FancyArrow(
+                    x=pos - dx * 0.46, y=row_i, dx=dx * 0.82, dy=0,
+                    width=arrow_h, head_width=arrow_h * 1.35, head_length=head_len,
+                    length_includes_head=True,
+                    facecolor=col, edgecolor=edge_c, linewidth=lw,
+                    alpha=alpha, zorder=2,
+                )
+                ax_genes.add_patch(arrow)
+                if abs(pos) <= flanks:
+                    ax_genes.text(
+                        pos, row_i + arrow_h * 0.82, label,
+                        ha="center", va="bottom",
+                        fontsize=4.8 if not is_hit else 5.5,
+                        fontweight="bold" if is_hit else "normal",
+                        color="#B71C1C" if is_hit else "#333333",
+                        clip_on=True,
+                    )
 
     # ── Functional colour legend ───────────────────────────────────────────
     legend_cats = [k for k in _FUNCTION_COLORS
@@ -1818,11 +1985,24 @@ def synteny_figure_plotly(
     conservation_df = _normalise_conservation_df(conservation_df)
     has_cons  = conservation_df is not None and not conservation_df.empty
 
+    # ── Coordinate-aware layout ────────────────────────────────────────────
+    coord_layout: dict[str, list[dict]] = {}
+    coord_bounds: list[float] = []
+    for _gid in genomes:
+        _layout, _ok = _coordinate_layout_for_genome(
+            synteny_df[synteny_df["hit_protein_id"] == _gid]
+        )
+        if _ok:
+            coord_layout[str(_gid)] = _layout
+            for _item in _layout:
+                coord_bounds.extend([float(_item["x0"]), float(_item["x1"])])
+    coordinate_mode = bool(coord_layout)
+
     fig = make_subplots(
         rows=2 if has_cons else 1, cols=1,
         row_heights=[0.18, 0.82] if has_cons else [1.0],
         vertical_spacing=0.04,
-        shared_xaxes=True,
+        shared_xaxes=False,
     )
 
     if has_cons:
@@ -1841,70 +2021,134 @@ def synteny_figure_plotly(
                       annotation_text="Core (70%)", row=1, col=1)
 
     gene_row = 2 if has_cons else 1
-    shapes, hover_traces, annotations = [], [], []
+    hover_traces: list = []
+
+    def _arrow_path(x0: float, x1: float, y: float, strand: str, height: float = 0.28) -> str:
+        left, right = min(x0, x1), max(x0, x1)
+        length = max(right - left, 0.04)
+        head   = min(max(length * 0.28, 0.025), 0.18)
+        y0p, y1p = y - height / 2.0, y + height / 2.0
+        if strand == "-":
+            return (f"M {right} {y0p} L {left + head} {y0p} L {left} {y} "
+                    f"L {left + head} {y1p} L {right} {y1p} Z")
+        return (f"M {left} {y0p} L {right - head} {y0p} L {right} {y} "
+                f"L {right - head} {y1p} L {left} {y1p} Z")
+
+    shapes: list = []
+    annotations: list = []
 
     for row_i, genome_id in enumerate(genomes):
-        for _, g in synteny_df[synteny_df["hit_protein_id"] == genome_id].iterrows():
-            pos    = float(g["position_rel"])
-            col    = str(g.get("color", "#9E9E9E"))
-            s      = str(g.get("strand", "+"))
-            label  = _gene_display_label(g, hit_label=hit_label, max_len=18)
-            name   = _clean_label_value(g.get("gene_name", "")) or label
-            pid    = _clean_label_value(g.get("flank_gene_id", g.get("protein_id", "")))
-            func   = _clean_label_value(g.get("function", ""))
-            source = str(g.get("source", ""))
-            is_hit = pos == 0
+        genome_genes = synteny_df[synteny_df["hit_protein_id"] == genome_id]
+        if coordinate_mode and str(genome_id) in coord_layout:
+            for item in coord_layout[str(genome_id)]:
+                g      = item["row"]
+                col    = str(g.get("color", "#9E9E9E"))
+                s      = _strand_symbol(g.get("strand", "+"))
+                label  = _gene_display_label(g, hit_label=hit_label, max_len=18)
+                pid    = _clean_label_value(g.get("flank_gene_id", g.get("protein_id", "")))
+                func   = _clean_label_value(g.get("function", ""))
+                source = str(g.get("source", ""))
+                pos    = float(g.get("position_rel", 0) or 0)
+                is_hit = pos == 0
+                y      = row_i + float(item.get("lane_offset", 0.0))
+                x0, x1, xm = float(item["x0"]), float(item["x1"]), float(item["x_mid"])
+                start, end  = int(item["start"]), int(item["end"])
+                overlap_note = str(item.get("overlap_note", ""))
 
-            shapes.append(dict(
-                type="rect",
-                x0=pos - 0.42, x1=pos + 0.42,
-                y0=row_i - 0.30, y1=row_i + 0.30,
-                fillcolor=col,
-                line=dict(color="#212121" if is_hit else col,
-                          width=2 if is_hit else 0.5),
-                layer="below",
-            ))
-            hover_traces.append(go.Scatter(
-                x=[pos], y=[row_i],
-                mode="markers",
-                marker=dict(size=20, opacity=0, color=col),
-                hovertemplate=(
-                    f"<b>{label}</b><br>"
-                    f"Protein ID: {pid or 'not available'}<br>"
-                    f"Function: {func}<br>"
-                    f"Position: {int(pos):+d}<br>"
-                    f"Strand: {s}<br>"
-                    f"Source: {source}<br>"
-                    f"Genome: {str(genome_id)[:50]}<extra></extra>"
-                ),
-                showlegend=False,
-            ))
-            annotations.append(dict(
-                x=pos, y=row_i, text=label,
-                showarrow=False,
-                font=dict(
-                    size=8 if not is_hit else 9,
-                    color="#B71C1C" if is_hit else "#263238",
-                ),
-                yshift=16,
-            ))
-            if is_hit:
-                annotations.append(dict(
-                    x=pos, y=row_i, text="▼",
-                    showarrow=False,
-                    font=dict(size=10, color="#F44336"), yshift=-18,
+                shapes.append(dict(
+                    type="path",
+                    path=_arrow_path(x0, x1, y, s),
+                    fillcolor=col,
+                    line=dict(color="#212121" if is_hit else col,
+                              width=2 if is_hit else 0.7),
+                    layer="below",
                 ))
+                hover_traces.append(go.Scatter(
+                    x=[xm], y=[y],
+                    mode="markers",
+                    marker=dict(size=22, opacity=0, color=col),
+                    hovertemplate=(
+                        f"<b>{label}</b><br>"
+                        f"Protein ID: {pid or 'not available'}<br>"
+                        f"Function: {func or 'not annotated'}<br>"
+                        f"Relative position: {int(pos):+d}<br>"
+                        f"Coordinates: {start}..{end} nt<br>"
+                        f"Strand: {s} ({'forward' if s == '+' else 'reverse'})<br>"
+                        f"{overlap_note + '<br>' if overlap_note else ''}"
+                        f"Source: {source}<br>"
+                        f"Genome: {str(genome_id)[:50]}<extra></extra>"
+                    ),
+                    showlegend=False,
+                ))
+                annotations.append(dict(
+                    x=xm, y=y, text=label, showarrow=False,
+                    font=dict(size=8 if not is_hit else 9,
+                              color="#B71C1C" if is_hit else "#263238"),
+                    yshift=16,
+                ))
+                if is_hit:
+                    annotations.append(dict(
+                        x=xm, y=y, text="▼", showarrow=False,
+                        font=dict(size=10, color="#F44336"), yshift=-17,
+                    ))
+        else:
+            for _, g in genome_genes.iterrows():
+                pos    = float(g["position_rel"])
+                col    = str(g.get("color", "#9E9E9E"))
+                s      = _strand_symbol(g.get("strand", "+"))
+                label  = _gene_display_label(g, hit_label=hit_label, max_len=18)
+                pid    = _clean_label_value(g.get("flank_gene_id", g.get("protein_id", "")))
+                func   = _clean_label_value(g.get("function", ""))
+                source = str(g.get("source", ""))
+                is_hit = pos == 0
+
+                shapes.append(dict(
+                    type="rect",
+                    x0=pos - 0.42, x1=pos + 0.42,
+                    y0=row_i - 0.30, y1=row_i + 0.30,
+                    fillcolor=col,
+                    line=dict(color="#212121" if is_hit else col,
+                              width=2 if is_hit else 0.5),
+                    layer="below",
+                ))
+                hover_traces.append(go.Scatter(
+                    x=[pos], y=[row_i],
+                    mode="markers",
+                    marker=dict(size=20, opacity=0, color=col),
+                    hovertemplate=(
+                        f"<b>{label}</b><br>"
+                        f"Protein ID: {pid or 'not available'}<br>"
+                        f"Function: {func}<br>"
+                        f"Position: {int(pos):+d}<br>"
+                        f"Strand: {s}<br>"
+                        f"Source: {source}<br>"
+                        f"Genome: {str(genome_id)[:50]}<extra></extra>"
+                    ),
+                    showlegend=False,
+                ))
+                annotations.append(dict(
+                    x=pos, y=row_i, text=label, showarrow=False,
+                    font=dict(size=8 if not is_hit else 9,
+                              color="#B71C1C" if is_hit else "#263238"),
+                    yshift=16,
+                ))
+                if is_hit:
+                    annotations.append(dict(
+                        x=pos, y=row_i, text="▼", showarrow=False,
+                        font=dict(size=10, color="#F44336"), yshift=-18,
+                    ))
 
     for trace in hover_traces:
         fig.add_trace(trace, row=gene_row, col=1)
 
+    x_title = "Position relative to query hit (kb)" if coordinate_mode else "Relative gene position"
     fig.update_layout(
         shapes=shapes, annotations=annotations,
         title="Synteny Neighbourhood (interactive — hover for gene details)",
         height=max(400, 80 + n_genomes * 38),
         plot_bgcolor="white", paper_bgcolor="white",
         font=dict(size=11), showlegend=False,
-        xaxis=dict(title="Relative gene position", dtick=1),
+        xaxis=dict(title=x_title, dtick=1 if not coordinate_mode else None),
         yaxis=dict(
             tickvals=list(range(n_genomes)),
             ticktext=[str(g)[:40] for g in genomes],
