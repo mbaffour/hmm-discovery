@@ -16,6 +16,20 @@ Use this index to decide which document belongs in which context.
   lab meetings, and onboarding.
 - `docs/METHODOLOGY.md`: scientific workflow and interpretation guidance.
 
+## For Command-Line And Pipeline Users
+
+- `scripts/README.md`: complete reference for the command-line pipeline — quick
+  start, a pipeline data-flow diagram, a per-step table, the full flag and
+  input/output reference for every script, and the batch/HPC/Methods workflow.
+- `docs/CLI_INTERACTIVE_GUIDE.md`: friendly walkthrough of the interactive
+  scripts — the guided wizard, explain-and-confirm gate, narration, and how
+  prompts auto-disable for HPC/batch runs.
+- `docs/cli_interactive_guide.html`: self-contained interactive browser guide
+  with a clickable step explorer and a live command builder (open by
+  double-clicking; no internet required).
+- `scripts/guide.py`: runnable interactive tour — `python3 scripts/guide.py`
+  explains each step, shows the command, and offers to run it.
+
 ## For Research Methods And Reviewers
 
 - `docs/METHODOLOGY.md`: detailed method logic, ORF modes, discovery versus

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HMM Discovery — CLI Pipeline Interactive Guide</title>
+<!--
+  Self-contained interactive guide to the HMM Discovery command-line pipeline.
+  No external/CDN dependencies — inline CSS + vanilla JS only, so it opens
+  offline by double-clicking. The page renders from the STEPS data array below;
+  to update a step's docs, edit that one object.
+-->
+<style>
+  :root{
+    --bg:#11151c; --panel:#1b212b; --panel2:#232b37; --ink:#e8edf4;
+    --muted:#9aa7b8; --line:#2e3947; --accent:#36c; --accent2:#21c7a8;
+    --yellow:#e2b53d; --green:#37b24d; --red:#e5484d; --mono:#cfe3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  header.top{
+    padding:28px 24px 18px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#161c25,#11151c);
+  }
+  header.top h1{margin:0 0 4px;font-size:24px;letter-spacing:.2px}
+  header.top p{margin:0;color:var(--muted)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  /* Tabs */
+  nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:18px auto 0;max-width:1080px;padding:0 20px}
+  nav.tabs button{
+    background:var(--panel);color:var(--muted);border:1px solid var(--line);
+    border-bottom:none;border-radius:8px 8px 0 0;padding:9px 16px;font-size:14px;
+    cursor:pointer;transition:.15s;
+  }
+  nav.tabs button:hover{color:var(--ink)}
+  nav.tabs button.active{background:var(--panel2);color:var(--ink);border-color:var(--accent)}
+  section.tab{display:none;background:var(--panel2);border:1px solid var(--line);
+    border-radius:0 10px 10px 10px;padding:22px;margin-bottom:40px}
+  section.tab.active{display:block}
+  h2{margin:4px 0 14px;font-size:19px}
+  h3{margin:22px 0 8px;font-size:16px;color:var(--accent2)}
+  p.lead{color:var(--muted)}
+  /* Terminal blocks */
+  .term{
+    background:#0c0f14;border:1px solid var(--line);border-radius:8px;
+    padding:14px 16px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.55;white-space:pre;color:var(--mono);
+  }
+  .term .c{color:var(--muted)}      /* comment / dim */
+  .term .y{color:var(--yellow)}     /* command */
+  .term .g{color:var(--green)}      /* success */
+  .term .a{color:var(--accent2)}    /* accent */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  /* Step explorer */
+  .explorer{display:grid;grid-template-columns:280px 1fr;gap:16px}
+  @media(max-width:760px){.explorer{grid-template-columns:1fr}}
+  .steplist{display:flex;flex-direction:column;gap:4px;max-height:560px;overflow:auto}
+  .steplist button{
+    text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:9px 12px;cursor:pointer;transition:.12s;font-size:13.5px;
+  }
+  .steplist button:hover{border-color:var(--accent2)}
+  .steplist button.active{background:var(--panel2);border-color:var(--accent);}
+  .steplist .num{display:inline-block;width:26px;color:var(--accent2);font-weight:700}
+  .detail{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;min-height:300px}
+  .detail h3{margin-top:0}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+    border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:12px;color:var(--muted)}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--ink)}
+  td code{color:var(--mono)}
+  .io{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0}
+  .io > div{flex:1;min-width:200px}
+  .io h4{margin:0 0 4px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  /* Command line + copy */
+  .cmdrow{display:flex;gap:8px;align-items:stretch;margin:10px 0}
+  .cmdbox{flex:1;background:#0c0f14;border:1px solid var(--line);border-radius:8px;
+    padding:11px 13px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+    color:var(--mono);overflow:auto;white-space:pre-wrap;word-break:break-word}
+  button.copy{background:var(--accent);border:none;color:#fff;border-radius:8px;
+    padding:0 16px;cursor:pointer;font-size:13px;white-space:nowrap}
+  button.copy:hover{filter:brightness(1.12)}
+  button.copy.ok{background:var(--green)}
+  /* Builder form */
+  .builder{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
+  .builder label{display:block;font-size:13px;color:var(--muted);margin:10px 0 3px}
+  .builder input[type=text],.builder select{
+    width:100%;background:#0c0f14;border:1px solid var(--line);color:var(--ink);
+    border-radius:7px;padding:8px 10px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+  .builder .checks{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px}
+  .builder .checks label{display:flex;align-items:center;gap:6px;margin:0;color:var(--ink)}
+  .note{background:#15202b;border-left:3px solid var(--accent2);padding:10px 14px;border-radius:4px;color:var(--muted);margin:14px 0}
+  .footer{color:var(--muted);font-size:13px;padding:10px 0 40px;text-align:center}
+  ul.clean{margin:8px 0;padding-left:20px}
+  ul.clean li{margin:4px 0}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>🧬 HMM Discovery — CLI Pipeline Guide</h1>
+    <p>Interactive reference for the command-line scripts. Click a step, build a command, copy it, run it.</p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="quick" class="active">Quick start</button>
+  <button data-tab="explore">Step explorer</button>
+  <button data-tab="builder">Command builder</button>
+  <button data-tab="batch">Batch &amp; HPC</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ───────────────────────── QUICK START ───────────────────────── -->
+<section class="tab active" id="tab-quick">
+  <h2>Quick start</h2>
+  <p class="lead">The scripts run the same pipeline as the web app. The fastest way in is the tour — it explains each step, shows the command, and offers to run it.</p>
+
+  <div class="cmdrow">
+    <div class="cmdbox" id="q-tour">python3 scripts/guide.py</div>
+    <button class="copy" data-copy="q-tour">Copy</button>
+  </div>
+
+  <h3>What it feels like</h3>
+  <p class="lead">Run any step with no arguments and it interviews you, explains every command before running it, and interprets the results.</p>
+
+  <div class="grid2">
+    <div>
+      <h4 style="color:var(--muted);font-size:13px">① Guided wizard</h4>
+      <div class="term"><span class="a">$ python3 scripts/03_search.py</span>
+
+  Path to your profile HMM? <span class="c">[results/profile.hmm]</span> &gt; <span class="a">↵</span>
+  Database FASTA to search? &gt; databases/inphared.faa
+  Add another database? <span class="c">[y/N]</span> &gt; n
+
+  How strict should the search be?
+    <span class="a">→ 1)</span> standard — recommended
+      2) permissive — distant homologs
+      3) strict — only strong matches
+  Choose 1-3 <span class="c">[1]</span> &gt; 1</div>
+    </div>
+    <div>
+      <h4 style="color:var(--muted);font-size:13px">② Explain &amp; confirm, ③ Narrate</h4>
+      <div class="term">  <span class="y">[CMD] hmmsearch -E 1e-5 --cpu 4 \
+        profile.hmm inphared.faa</span>
+  <span class="c">↳ keep matches with E ≤ 1e-5</span>
+
+  Search inphared now? <span class="c">[Y/n]</span> &gt; y
+
+  <span class="g">✓ 47 hits · 12 strong (bit ≥ 45)</span>
+    <span class="c">↳ 12 strong → probable true members</span>
+
+<span class="g">✓ Done.</span> <span class="c">Next: 04_score_hits.py</span></div>
+    </div>
+  </div>
+
+  <h3>The minimal chain</h3>
+  <p class="lead">Seeds → report in five commands:</p>
+  <div class="cmdrow">
+    <div class="cmdbox" id="q-chain">python3 scripts/01_align.py --seeds my_seeds.faa --out-dir results/
+python3 scripts/02_build_hmm.py --aln results/seeds_aligned.faa --out-dir results/
+python3 scripts/03_search.py --hmm results/profile.hmm --db databases/inphared.faa
+python3 scripts/05_classify_hits.py --hits results/hits_combined.tsv --db databases/inphared.faa
+python3 scripts/14_report.py --proj-dir .</div>
+    <button class="copy" data-copy="q-chain">Copy</button>
+  </div>
+
+  <div class="note">A script is interactive only when stdin <em>and</em> stdout are real terminals and you didn't pass <code>--yes</code>. Piped, redirected, or <code>--yes</code> → it runs silently with defaults and never blocks. See the <b>Batch &amp; HPC</b> tab.</div>
+</section>
+
+<!-- ───────────────────────── STEP EXPLORER ───────────────────────── -->
+<section class="tab" id="tab-explore">
+  <h2>Step explorer</h2>
+  <p class="lead">Click a step to see what it does, its inputs and outputs, every flag, and an example command you can copy.</p>
+  <div class="explorer">
+    <div class="steplist" id="steplist"><!-- buttons injected --></div>
+    <div class="detail" id="stepdetail"><!-- detail injected --></div>
+  </div>
+</section>
+
+<!-- ───────────────────────── COMMAND BUILDER ───────────────────────── -->
+<section class="tab" id="tab-builder">
+  <h2>Command builder</h2>
+  <p class="lead">Pick a script, fill in your paths and options, and copy the exact command.</p>
+
+  <div class="builder">
+    <label for="b-script">Script</label>
+    <select id="b-script">
+      <option value="run_pipeline">run_pipeline.py — whole pipeline</option>
+      <option value="align">01_align.py — align seeds</option>
+      <option value="search">03_search.py — search a database</option>
+    </select>
+
+    <div id="b-fields"><!-- fields injected per script --></div>
+
+    <div class="checks" id="b-checks"><!-- checkboxes injected --></div>
+  </div>
+
+  <div class="cmdrow">
+    <div class="cmdbox" id="b-out">python3 scripts/run_pipeline.py</div>
+    <button class="copy" data-copy="b-out">Copy</button>
+  </div>
+  <div class="note" id="b-explain"></div>
+</section>
+
+<!-- ───────────────────────── BATCH & HPC ───────────────────────── -->
+<section class="tab" id="tab-batch">
+  <h2>Batch, HPC &amp; Methods extraction</h2>
+  <p class="lead">When no human is watching — a cluster job, cron, or a reproducible re-run — make everything silent with <code>--yes</code>.</p>
+
+  <h3>Whole pipeline, hands-off</h3>
+  <div class="cmdrow">
+    <div class="cmdbox" id="ba-1">python3 scripts/run_pipeline.py --seeds my_seeds.faa --db databases/inphared.faa --proj-dir my_project/ --email you@uni.edu --cpu 8 --yes</div>
+    <button class="copy" data-copy="ba-1">Copy</button>
+  </div>
+
+  <h3>Capture commands for a Methods section</h3>
+  <p class="lead">Every tool call prints a <code>[CMD]</code> line. Dry-run it, or grep a real log.</p>
+  <div class="cmdrow">
+    <div class="cmdbox" id="ba-2">python3 scripts/03_search.py --hmm profile.hmm --db db.faa --explain-only</div>
+    <button class="copy" data-copy="ba-2">Copy</button>
+  </div>
+  <div class="cmdrow">
+    <div class="cmdbox" id="ba-3">python3 scripts/run_pipeline.py ... --yes 2>&amp;1 | tee run.log
+grep '[CMD]' run.log</div>
+    <button class="copy" data-copy="ba-3">Copy</button>
+  </div>
+  <p class="lead"><code>14_report.py</code> also writes a ready-to-paste <code>methods.txt</code> and a <code>reproducibility.json</code> audit trail.</p>
+
+  <h3>Resume or skip steps</h3>
+  <div class="cmdrow">
+    <div class="cmdbox" id="ba-4">python3 scripts/run_pipeline.py ... --start-at 07 --skip 09 11 --yes</div>
+    <button class="copy" data-copy="ba-4">Copy</button>
+  </div>
+
+  <h3>Interactive vs hands-off — same command, different output</h3>
+  <div class="grid2">
+    <div>
+      <h4 style="color:var(--muted);font-size:13px">In a terminal</h4>
+      <div class="term">  Search inphared now? <span class="c">[Y/n]</span> &gt; <span class="a">_</span>
+  <span class="c">(waits for you)</span></div>
+    </div>
+    <div>
+      <h4 style="color:var(--muted);font-size:13px">With --yes (HPC / cron)</h4>
+      <div class="term">  <span class="y">[CMD] hmmsearch -E 1e-5 ...</span>
+  <span class="g">✓ 47 hits · 12 strong</span>
+  <span class="c">(no prompt, never blocks)</span></div>
+    </div>
+  </div>
+
+  <h3>Shared flags</h3>
+  <table>
+    <tr><th>Flag</th><th>Effect</th></tr>
+    <tr><td><code>--yes</code>, <code>-y</code></td><td>Non-interactive: accept defaults, never prompt</td></tr>
+    <tr><td><code>--interactive</code></td><td>Force prompts even when stdout isn't a terminal</td></tr>
+    <tr><td><code>--no-color</code></td><td>Disable ANSI colour (also honours <code>NO_COLOR</code>)</td></tr>
+    <tr><td><code>--explain-only</code></td><td>Dry run: print explanations + commands, run nothing</td></tr>
+  </table>
+</section>
+
+<div class="footer">
+  Full reference: <code>scripts/README.md</code> · Walkthrough: <code>docs/CLI_INTERACTIVE_GUIDE.md</code> · Tour: <code>python3 scripts/guide.py</code>
+</div>
+</div><!-- /wrap -->
+
+<script>
+/* ───────────────────────── DATA ─────────────────────────
+   Single source of truth for the step explorer. Mirrors the script docstrings
+   and scripts/README.md. Edit here to update the explorer. */
+const STEPS = [
+ {id:"01",name:"Align seeds",purpose:"Line up your seed proteins column-by-column so a model can see which positions are conserved (MAFFT / Clustal Omega).",
+  inputs:["--seeds  un-aligned seed FASTA"],outputs:["seeds_aligned.faa","seeds_trimmed.faa (if --trim)"],
+  flags:[["--seeds","wizard","seed protein FASTA"],["--tool","mafft","mafft or clustalo"],["--trim","off","trimAl --automated1"],["--threads","4","aligner threads"],["--out-dir","results/","output directory"]],
+  ex:"python3 scripts/01_align.py --seeds my_seeds.faa --out-dir results/"},
+ {id:"02",name:"Build HMM",purpose:"Turn the alignment into a profile HMM — a position-by-position statistical fingerprint of the family.",
+  inputs:["--aln  aligned FASTA (step 01)"],outputs:["profile.hmm"],
+  flags:[["--aln","wizard","aligned FASTA"],["--name","novel_phage_gene","name embedded in HMM"],["--out-dir","results/","output directory"]],
+  ex:"python3 scripts/02_build_hmm.py --aln results/seeds_aligned.faa"},
+ {id:"03",name:"Search databases",purpose:"Score every protein in a database against the HMM with hmmsearch. Nucleotide DBs are 6-frame translated first.",
+  inputs:["--hmm  profile HMM","--db   target FASTA (repeatable)"],outputs:["search_results/<db>.tblout","hits_combined.tsv"],
+  flags:[["--hmm","wizard","profile HMM"],["--db","wizard","target FASTA (repeat for many)"],["--evalue","1e-5","E-value threshold"],["--cpu","4","threads"],["--nuc / --sixframe","off","6-frame translate nucleotide DBs"]],
+  ex:"python3 scripts/03_search.py --hmm results/profile.hmm --db phages.faa"},
+ {id:"04",name:"Score hits",purpose:"Weigh bit score, HMM coverage and composition bias to sort hits into high-confidence / putative / divergent tiers.",
+  inputs:["--hits  hits TSV (step 03)"],outputs:["hits_scored.tsv (+ confidence_tier)"],
+  flags:[["--hits","wizard","hits TSV"],["--bitscore","45.0","high_confidence boundary"],["--coverage","0.30","min HMM coverage for putative"],["--evalue","1e-5","pre-filter E-value"]],
+  ex:"python3 scripts/04_score_hits.py --hits results/hits_combined.tsv"},
+ {id:"05",name:"Classify + extract",purpose:"Build the canonical, fully-annotated hits table and extract the hit protein sequences from the source FASTA(s).",
+  inputs:["--hits  scored/raw hits TSV","--db   source protein FASTA (repeatable)"],outputs:["hits_main.tsv","hits_proteins.faa"],
+  flags:[["--hits","wizard","hits TSV"],["--db","wizard","source FASTA (repeat)"],["--domtblout","—","per-domain coords"],["--bitscore","45.0","high_confidence boundary"]],
+  ex:"python3 scripts/05_classify_hits.py --hits results/hits_scored.tsv --db phages.faa"},
+ {id:"06",name:"Iterate (optional)",purpose:"Grow the seed set with strong new hits and rebuild the HMM, round by round, until convergence — jackhmmer-style.",
+  inputs:["--seeds","--hits-faa","--hmm","--db (repeatable)"],outputs:["seeds_expanded.faa","profile_final.hmm","iteration_history.tsv"],
+  flags:[["--seeds","wizard","initial seeds"],["--hits-faa","wizard","candidate sequences (step 05)"],["--hmm","wizard","starting HMM"],["--db","wizard","target DB(s)"],["--iterations","5","max rounds"],["--bitscore","45.0","admit a new seed"]],
+  ex:"python3 scripts/06_iterate.py --seeds seeds.faa --hits-faa results/hits_proteins.faa --hmm results/profile.hmm --db phages.faa"},
+ {id:"07",name:"Synteny",purpose:"Fetch flanking genes for each hit, build neighbourhood tables, score conservation, draw gene-maps, and optionally run clinker.",
+  inputs:["--hits  hits TSV (step 05)"],outputs:["synteny_table.tsv","synteny_map.{png,svg,pdf}","synteny_neighborhoods.gff3","clinker/clinker_output.html"],
+  flags:[["--hits","wizard","hits TSV"],["--email","researcher@example.com","NCBI Entrez e-mail"],["--flanks","5","genes each side"],["--max-genomes","30","loci cap"],["--local-gb","—","local GenBank dir (offline)"],["--clinker","off","build clinker HTML"],["--identity","0.3","min identity for clinker links"]],
+  ex:"python3 scripts/07_synteny.py --hits results/hits_main.tsv --email you@uni.edu --clinker"},
+ {id:"08",name:"Taxonomy",purpose:"Parse each hit's sequence ID to infer host type, organism name and taxonomy — no external tools required.",
+  inputs:["--hits  hits TSV"],outputs:["taxonomy_table.tsv"],
+  flags:[["--hits","wizard","hits TSV"],["--out-dir","results/","output directory"]],
+  ex:"python3 scripts/08_taxonomy.py --hits results/hits_main.tsv"},
+ {id:"09",name:"Phylogeny",purpose:"Infer a maximum-likelihood phylogenetic tree with IQ-TREE and ultra-fast bootstrap branch support.",
+  inputs:["--aln  aligned FASTA (step 01)"],outputs:["iqtree.treefile","tree.png"],
+  flags:[["--aln","wizard","aligned FASTA"],["--model","TEST","substitution model or auto"],["--bootstrap","1000","UFBoot replicates"],["--cpu","4","threads"]],
+  ex:"python3 scripts/09_phylogeny.py --aln results/seeds_aligned.faa"},
+ {id:"10",name:"Presence/absence",purpose:"Turn the hit list into a binary genome × gene matrix and a clustered heatmap.",
+  inputs:["--hits  hits TSV"],outputs:["presence_absence_matrix.tsv","presence_absence_heatmap.png"],
+  flags:[["--hits","wizard","hits TSV"],["--tiers","high_confidence putative divergent","tiers to include"]],
+  ex:"python3 scripts/10_matrix.py --hits results/hits_main.tsv"},
+ {id:"11",name:"Cluster",purpose:"Group hit sequences above an identity threshold and pick one representative per cluster (CD-HIT or MMseqs2).",
+  inputs:["--faa  protein FASTA (step 05)"],outputs:["cluster_reps.faa","cluster_membership.tsv","cluster_summary.tsv"],
+  flags:[["--faa","wizard","protein FASTA"],["--tool","auto","auto / cd-hit / mmseqs2"],["--identity","0.40","identity threshold"],["--coverage","0.80","coverage threshold"]],
+  ex:"python3 scripts/11_cluster.py --faa results/hits_proteins.faa"},
+ {id:"12",name:"Motifs",purpose:"Discover conserved sequence motifs de novo with MEME and scan for their occurrences with FIMO.",
+  inputs:["--faa  protein FASTA"],outputs:["meme_out/","fimo_hits.tsv"],
+  flags:[["--faa","wizard","protein FASTA"],["--nmotifs","5","motifs to find"],["--minw","6","min width"],["--maxw","50","max width"],["--no-fimo","off","skip FIMO"]],
+  ex:"python3 scripts/12_motifs.py --faa results/hits_proteins.faa"},
+ {id:"13",name:"Annotate",purpose:"Add functional context: domain architecture (from Pfam domtblout) plus transmembrane/signal-peptide topology.",
+  inputs:["--faa  hit FASTA","--hmm  profile HMM","--domtblout  Pfam table"],outputs:["domain_architecture.tsv","annotation_summary.tsv"],
+  flags:[["--faa","wizard","hit FASTA"],["--hmm","wizard","profile HMM"],["--domtblout","wizard","Pfam --domtblout"],["--phobius","off","run Phobius"],["--tmhmm","off","run TMHMM"]],
+  ex:"python3 scripts/13_annotate.py --faa results/hits_proteins.faa --hmm results/profile.hmm --domtblout pfam.domtblout"},
+ {id:"14",name:"Report",purpose:"Gather every result, figure and tool version into a shareable record: HTML report, Methods text, reproducibility JSON, export ZIP.",
+  inputs:["--proj-dir  project root"],outputs:["report.html","methods.txt","reproducibility.json","export.zip"],
+  flags:[["--proj-dir","wizard","project root"],["--out-dir","<proj>/reports/","report output dir"]],
+  ex:"python3 scripts/14_report.py --proj-dir my_project/"}
+];
+
+/* ───────────────────────── TABS ───────────────────────── */
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('section.tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+  });
+});
+
+/* ───────────────────────── COPY BUTTONS ───────────────────────── */
+function wireCopy(scope){
+  (scope||document).querySelectorAll('button.copy').forEach(btn=>{
+    if(btn._wired) return; btn._wired=true;
+    btn.addEventListener('click',()=>{
+      const txt=document.getElementById(btn.dataset.copy).innerText;
+      const done=()=>{const o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
+        setTimeout(()=>{btn.textContent=o;btn.classList.remove('ok')},1200);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(done,()=>fallback(txt,done));
+      }else fallback(txt,done);
+    });
+  });
+}
+function fallback(txt,done){
+  const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);
+  t.select();try{document.execCommand('copy')}catch(e){}t.remove();done();
+}
+wireCopy();
+
+/* ───────────────────────── STEP EXPLORER ───────────────────────── */
+const list=document.getElementById('steplist');
+STEPS.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.innerHTML='<span class="num">'+s.id+'</span>'+s.name;
+  b.addEventListener('click',()=>{showStep(i);
+    list.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');});
+  list.appendChild(b);
+});
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showStep(i){
+  const s=STEPS[i];
+  let flagRows=s.flags.map(f=>'<tr><td><code>'+esc(f[0])+'</code></td><td>'+esc(f[1])+'</td><td>'+esc(f[2])+'</td></tr>').join('');
+  let inp=s.inputs.map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
+  let outp=s.outputs.map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
+  document.getElementById('stepdetail').innerHTML=
+    '<h3>Step '+s.id+' — '+esc(s.name)+'</h3>'+
+    '<p class="lead">'+esc(s.purpose)+'</p>'+
+    '<div class="io"><div><h4>Inputs</h4>'+inp+'</div><div><h4>Outputs</h4>'+outp+'</div></div>'+
+    '<table><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>'+flagRows+'</table>'+
+    '<h4 style="color:var(--muted);font-size:13px;margin-top:14px">Example</h4>'+
+    '<div class="cmdrow"><div class="cmdbox" id="se-cmd">'+esc(s.ex)+'</div>'+
+    '<button class="copy" data-copy="se-cmd">Copy</button></div>';
+  wireCopy(document.getElementById('stepdetail'));
+}
+showStep(0);
+list.querySelector('button').classList.add('active');
+
+/* ───────────────────────── COMMAND BUILDER ───────────────────────── */
+const BUILD={
+  run_pipeline:{
+    script:"run_pipeline.py",
+    fields:[["--seeds","my_seeds.faa","text"],["--db","databases/inphared.faa","text"],
+            ["--proj-dir","my_project/","text"],["--email","you@uni.edu","text"],["--cpu","8","text"]],
+    checks:[["--trim","trimAl after alignment"],["--nuc","nucleotide databases"],["--yes","hands-off (no prompts)"]],
+    note:"Runs all 14 steps in order, wiring each output into the next."
+  },
+  align:{
+    script:"01_align.py",
+    fields:[["--seeds","my_seeds.faa","text"],["--out-dir","results/","text"],
+            ["--tool","mafft","select:mafft,clustalo"],["--threads","4","text"]],
+    checks:[["--trim","trim with trimAl"],["--yes","hands-off"]],
+    note:"Aligns seed proteins; add --trim to remove poorly-aligned columns."
+  },
+  search:{
+    script:"03_search.py",
+    fields:[["--hmm","results/profile.hmm","text"],["--db","databases/inphared.faa","text"],
+            ["--evalue","1e-5","select:1e-5,1e-3,1e-10"],["--cpu","4","text"]],
+    checks:[["--nuc","nucleotide DB (6-frame translate)"],["--yes","hands-off"]],
+    note:"Searches the database with your HMM. Lower --evalue = stricter."
+  }
+};
+const bScript=document.getElementById('b-script');
+const bFields=document.getElementById('b-fields');
+const bChecks=document.getElementById('b-checks');
+const bOut=document.getElementById('b-out');
+const bExplain=document.getElementById('b-explain');
+
+function renderBuilder(){
+  const cfg=BUILD[bScript.value];
+  bFields.innerHTML='';
+  cfg.fields.forEach(([flag,ph,type])=>{
+    const id='bf-'+flag.replace(/\W/g,'');
+    const lab=document.createElement('label');lab.textContent=flag;lab.setAttribute('for',id);
+    bFields.appendChild(lab);
+    let el;
+    if(type&&type.startsWith('select:')){
+      el=document.createElement('select');
+      type.slice(7).split(',').forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;el.appendChild(op);});
+      el.value=ph;
+    }else{el=document.createElement('input');el.type='text';el.value=ph;}
+    el.id=id;el.dataset.flag=flag;el.addEventListener('input',buildCmd);el.addEventListener('change',buildCmd);
+    bFields.appendChild(el);
+  });
+  bChecks.innerHTML='';
+  cfg.checks.forEach(([flag,desc])=>{
+    const id='bc-'+flag.replace(/\W/g,'');
+    const lab=document.createElement('label');
+    const cb=document.createElement('input');cb.type='checkbox';cb.id=id;cb.dataset.flag=flag;
+    if(flag==='--yes')cb.checked=true;
+    cb.addEventListener('change',buildCmd);
+    lab.appendChild(cb);lab.appendChild(document.createTextNode(' '+flag+' — '+desc));
+    bChecks.appendChild(lab);
+  });
+  bExplain.textContent=cfg.note;
+  buildCmd();
+}
+function buildCmd(){
+  const cfg=BUILD[bScript.value];
+  let parts=['python3','scripts/'+cfg.script];
+  bFields.querySelectorAll('[data-flag]').forEach(el=>{
+    const v=el.value.trim();
+    if(v) parts.push(el.dataset.flag,v);
+  });
+  bChecks.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    if(cb.checked) parts.push(cb.dataset.flag);
+  });
+  bOut.textContent=parts.join(' ');
+}
+bScript.addEventListener('change',renderBuilder);
+renderBuilder();
+</script>
+</body>
+</html>

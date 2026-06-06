@@ -17,6 +17,7 @@ HMM Discovery is built for researchers, graduate students, and bioinformatics co
 - [No-Code App Runs](#no-code-app-runs)
 - [Local File And Folder Picking](#local-file-and-folder-picking)
 - [Full Research Run](#full-research-run)
+- [Command-Line Pipeline](#command-line-pipeline)
 - [Exhaustive All-Database Benchmark](#exhaustive-all-database-benchmark)
 - [Database Behavior](#database-behavior)
 - [Synteny Outputs](#synteny-outputs)
@@ -55,12 +56,16 @@ app.py                    Shiny app entry point
 core/                     Environment checks, state, logging, job runners
 databases/                Built-in database registry and download helpers
 pipeline/                 Alignment, HMM, search, synteny, motifs, tree, reports
+scripts/                  Command-line version of the whole pipeline (see scripts/README.md)
 ui/                       Shiny UI step modules
 www/                      Static assets and app guide
 www/index.html            Website-style landing page for the app
 www/presentation/         Presentation-ready workflow diagrams
 example_data/             Synthetic demo data only
 docs/                     Interactive guide, blog post, deployment checklist
+scripts/README.md         Command-line pipeline reference (flags, I/O, batch/HPC, Methods)
+docs/CLI_INTERACTIVE_GUIDE.md  Walkthrough of the interactive command-line scripts
+docs/cli_interactive_guide.html  Self-contained interactive CLI guide (open in a browser)
 docs/STARTUP_GUIDE.md     Comprehensive startup guide for Conda, Docker, demo runs, and long runs
 docs/METHODOLOGY.md       Scientific workflow and manuscript-facing methodology
 docs/DOCUMENTATION_INDEX.md  Map of user, reviewer, deployment, and citation docs
@@ -164,6 +169,34 @@ For a manuscript-facing explanation of the full workflow, see [docs/METHODOLOGY.
 Presentation diagrams are in [www/presentation](www/presentation). They include
 a workflow overview, no-code user journey, database strategy, and reproducible
 output package diagram for slides and lab meetings.
+
+## Command-Line Pipeline
+
+Every step the app performs is also available as a standalone command-line
+script in `scripts/`, driving the same `pipeline/` code. Use the scripts for HPC
+clusters, automation, headless servers, or to produce an exact, copy-pasteable
+Methods section for a paper.
+
+The scripts are interactive in a terminal (they interview you for missing
+inputs, explain each command before running it, and interpret the results) and
+silent/non-blocking when piped or given `--yes` — so the same script is safe to
+run by hand or inside a cluster job.
+
+```bash
+python3 scripts/guide.py                  # interactive tour of the whole pipeline
+python3 scripts/run_pipeline.py           # run all 14 steps (wizard)
+python3 scripts/01_align.py --help        # any single step
+```
+
+Documentation:
+
+- [`scripts/README.md`](scripts/README.md) — full flag and input/output reference,
+  data-flow diagram, and the batch/HPC/Methods workflow.
+- [`docs/CLI_INTERACTIVE_GUIDE.md`](docs/CLI_INTERACTIVE_GUIDE.md) — friendly
+  walkthrough of the interactive experience.
+- [`docs/cli_interactive_guide.html`](docs/cli_interactive_guide.html) — a
+  self-contained interactive guide with a clickable step explorer and a live
+  command builder (open in any browser).
 
 ## Exhaustive All-Database Benchmark
 
