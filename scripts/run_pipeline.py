@@ -324,6 +324,7 @@ def main():
             in_hits = hits_tsv if hits_tsv.exists() else results_dir / "hits_combined.tsv"
             step_args = [
                 "--hits",    str(in_hits),
+                "--hmm",     str(profile_hmm),   # needed for the true HMM length
                 "--out-dir", str(results_dir),
                 "--evalue",  str(args.evalue),
             ]
@@ -332,6 +333,7 @@ def main():
             in_hits = scored_tsv if scored_tsv.exists() else hits_tsv
             step_args = [
                 "--hits",    str(in_hits),
+                "--hmm",     str(profile_hmm),   # needed for the true HMM length
                 "--out-dir", str(results_dir),
             ] + db_flags
 

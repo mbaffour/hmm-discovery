@@ -83,26 +83,36 @@ def parse_args():
 
 
 def _collect_tool_versions() -> dict:
-    """Return a dict of tool_name -> version string for common tools."""
+    """Return a tool-info dict in the canonical shape the reporter expects:
+
+        {tool_name: {"available": bool, "version": str|None, "description": str}}
+
+    This matches core.logger.check_tools() so build_reproducibility_json(), which
+    filters on ``v.get("available")`` and reads ``v.get("version")``, works
+    correctly. (Returning bare version strings here is what previously crashed
+    the report step with 'str object has no attribute get'.)
+    """
     import subprocess
-    versions = {}
+    info: dict = {}
     tool_cmds = {
-        "hmmbuild":  ["hmmbuild", "--version"],
-        "mafft":     ["mafft", "--version"],
-        "iqtree2":   ["iqtree2", "--version"],
-        "trimal":    ["trimal", "--version"],
-        "clustalo":  ["clustalo", "--version"],
-        "meme":      ["meme", "--version"],
-        "cd-hit":    ["cd-hit", "-h"],
+        "hmmbuild":  (["hmmbuild", "-h"],     "Profile HMM construction (HMMER)"),
+        "hmmsearch": (["hmmsearch", "-h"],    "Profile HMM search (HMMER)"),
+        "mafft":     (["mafft", "--version"], "Multiple sequence alignment"),
+        "iqtree2":   (["iqtree2", "--version"], "Maximum-likelihood phylogeny"),
+        "trimal":    (["trimal", "--version"], "Alignment trimming"),
+        "clustalo":  (["clustalo", "--version"], "Multiple sequence alignment"),
+        "meme":      (["meme", "-version"],   "Motif discovery"),
+        "cd-hit":    (["cd-hit", "-h"],       "Sequence clustering"),
     }
-    for tool, cmd in tool_cmds.items():
+    for tool, (cmd, desc) in tool_cmds.items():
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             out = (proc.stdout + proc.stderr).strip().splitlines()
-            versions[tool] = out[0] if out else "installed"
+            version = out[0].strip() if out else "installed"
+            info[tool] = {"available": True, "version": version, "description": desc}
         except Exception:
-            pass
-    return versions
+            info[tool] = {"available": False, "version": None, "description": desc}
+    return info
 
 
 def main():

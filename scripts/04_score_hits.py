@@ -70,6 +70,10 @@ def parse_args():
     # Not required=True: a human in a terminal can supply these via the wizard.
     p.add_argument("--hits",     type=Path,
                    help="Input hits TSV (output of 03_search.py or similar).")
+    p.add_argument("--hmm",      type=Path,
+                   help="Profile HMM (02_build_hmm.py). Read to get the true HMM "
+                        "length — strongly recommended, otherwise every hit is "
+                        "flagged likely_fp when the length can't be inferred.")
     p.add_argument("--out-dir",  default=Path("results"), type=Path,
                    help="Output directory.")
     p.add_argument("--evalue",   default=1e-5,   type=float,
@@ -100,6 +104,13 @@ def main():
             default="results/hits_combined.tsv",
             help_text="The combined hits table written by 03_search.py.",
         )
+        if args.hmm is None:
+            args.hmm = guide.ask_path(
+                "Path to your profile HMM?",
+                default="results/profile.hmm",
+                help_text="Read to get the HMM length so coverage can be judged. "
+                          "Without it, every hit is flagged likely_fp.",
+            )
         args.bitscore = float(guide.ask_choice(
             "Strict bit-score cutoff for the high-confidence tier?",
             [
@@ -145,12 +156,30 @@ def main():
         df = df[pd.to_numeric(df["evalue"], errors="coerce") <= args.evalue].copy()
         guide.detail(f"After e-value filter (≤ {args.evalue}): {len(df)} / {before} rows.")
 
-    # Determine HMM length: from argument, or from hmm_to column max, or 0.
+    # Determine HMM length, in priority order:
+    #   1. explicit --hmm-length
+    #   2. read it from the profile HMM (--hmm)  ← the accurate source
+    #   3. infer from the hmm_to column (only present when a domtblout was merged)
+    # This matters a lot: score_hit() flags EVERY hit as likely_fp when the HMM
+    # length is 0 (it cannot judge coverage), so we work hard to find a real one.
     hmm_length = args.hmm_length
-    if hmm_length == 0 and "hmm_to" in df.columns:
-        hmm_length = int(df["hmm_to"].max()) if not df["hmm_to"].isna().all() else 0
+    if hmm_length == 0 and args.hmm is not None:
+        hmm_file = args.hmm.resolve()
+        if hmm_file.exists():
+            try:
+                from pipeline.hmm_builder import parse_hmm_file
+                hmm_length = int(parse_hmm_file(hmm_file).get("LENG", 0) or 0)
+                guide.detail(f"HMM length read from {hmm_file.name}: {hmm_length}")
+            except Exception as exc:
+                guide.warn(f"Could not read HMM length from {hmm_file.name}: {exc}")
+        else:
+            guide.warn(f"--hmm not found: {hmm_file}")
+    if hmm_length == 0 and "hmm_to" in df.columns and not df["hmm_to"].isna().all():
+        hmm_length = int(df["hmm_to"].max())
+        guide.detail(f"HMM length inferred from hmm_to column: {hmm_length}")
     if hmm_length == 0:
-        guide.warn("HMM length unknown; scoring all hits as full coverage.")
+        guide.warn("HMM length unknown — every hit would be flagged likely_fp. "
+                   "Pass --hmm results/profile.hmm so coverage can be judged.")
 
     strict = args.bitscore
     moderate = strict * 0.67  # ~30 if strict=45 — the putative/divergent boundary.
@@ -170,7 +199,10 @@ def main():
     guide.narrate("Classifying hits and adding QC flags …")
     scored = classify_hits(df, hmm_length=hmm_length, strict=strict,
                            moderate=moderate, hmm_cov_floor=args.coverage)
-    scored = add_qc_flags(scored)
+    # add_qc_flags() returns a Series of pipe-separated flag strings, one per
+    # row — assign it to the qc_flags column (do NOT rebind `scored`, which
+    # would replace the whole DataFrame with a Series and corrupt the output).
+    scored["qc_flags"] = add_qc_flags(scored)
 
     out_path = out_dir / "hits_scored.tsv"
     scored.to_csv(out_path, sep="\t", index=False)

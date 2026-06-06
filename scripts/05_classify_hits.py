@@ -80,8 +80,12 @@ def parse_args():
                         "Repeat for multiple databases.")
     p.add_argument("--domtblout",  type=Path,
                    help="Optional: domtblout file to supplement domain coordinates.")
+    p.add_argument("--hmm",        type=Path,
+                   help="Profile HMM (02_build_hmm.py). Read to get the true HMM "
+                        "length used for confidence tiering — strongly recommended, "
+                        "otherwise every hit is tiered likely_fp.")
     p.add_argument("--hmm-length", default=0,      type=int,
-                   help="HMM profile length (match states). 0 = infer from data.")
+                   help="HMM profile length (match states). 0 = infer from --hmm/data.")
     p.add_argument("--bitscore",   default=45.0,   type=float,
                    help="Strict bit-score threshold (high_confidence boundary).")
     p.add_argument("--out-dir",    default=Path("results"), type=Path,
@@ -115,6 +119,13 @@ def main():
             args.dbs = [first]
             while guide.ask_yesno("Add another source database?", default_yes=False):
                 args.dbs.append(guide.ask_path("Next database FASTA?"))
+        if args.hmm is None:
+            args.hmm = guide.ask_path(
+                "Path to your profile HMM?",
+                default="results/profile.hmm",
+                help_text="Read for the HMM length used in confidence tiering. "
+                          "Without it, every hit is tiered likely_fp.",
+            )
 
     # ── Validate (works in both modes) ───────────────────────────────────
     if args.hits is None:
@@ -148,10 +159,34 @@ def main():
         else:
             guide.warn(f"domtblout not found: {domtblout_path}")
 
-    # Determine HMM length.
+    # Determine HMM length, in priority order:
+    #   1. explicit --hmm-length
+    #   2. read it from the profile HMM (--hmm)  ← accurate
+    #   3. infer from the domtblout's hmm_to max
+    #   4. infer from a hmm_to column in the hits TSV
+    # build_main_hits_table() re-runs confidence tiering, and score_hit() flags
+    # EVERY hit as likely_fp when the length is 0 — so a real length is critical.
     hmm_length = args.hmm_length
-    if hmm_length == 0 and "hmm_to" in df.columns:
-        hmm_length = int(df["hmm_to"].max()) if not df["hmm_to"].isna().all() else 0
+    if hmm_length == 0 and args.hmm is not None:
+        hmm_file = args.hmm.resolve()
+        if hmm_file.exists():
+            try:
+                from pipeline.hmm_builder import parse_hmm_file
+                hmm_length = int(parse_hmm_file(hmm_file).get("LENG", 0) or 0)
+                guide.detail(f"HMM length read from {hmm_file.name}: {hmm_length}")
+            except Exception as exc:
+                guide.warn(f"Could not read HMM length from {hmm_file.name}: {exc}")
+        else:
+            guide.warn(f"--hmm not found: {hmm_file}")
+    if hmm_length == 0 and not dom_df.empty and "hmm_to" in dom_df.columns \
+            and not dom_df["hmm_to"].isna().all():
+        hmm_length = int(dom_df["hmm_to"].max())
+        guide.detail(f"HMM length inferred from domtblout: {hmm_length}")
+    if hmm_length == 0 and "hmm_to" in df.columns and not df["hmm_to"].isna().all():
+        hmm_length = int(df["hmm_to"].max())
+    if hmm_length == 0:
+        guide.warn("HMM length unknown — hits will be tiered likely_fp. "
+                   "Pass --hmm results/profile.hmm.")
 
     strict = args.bitscore
     moderate = strict * 0.67
